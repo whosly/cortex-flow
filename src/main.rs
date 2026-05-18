@@ -1,4 +1,4 @@
-//! # AI Agent Scheduler
+//! # cortex-flow
 //!
 //! AI智能体调度框架
 //!
@@ -17,7 +17,7 @@
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("=== AI Agent Scheduler ===\n");
+    println!("=== cortex-flow ===\n");
     println!("This is a library crate. Run examples with:");
     println!();
     println!("  cargo run --example simple_example");
