@@ -57,6 +57,10 @@ tokio-test = "0.4"
 mockall = "0.12"
 tempfile = "3.8"
 
+[[test]]
+name = "dag"
+path = "tests/dag/mod.rs"
+
 [features]
 default = []
 # 启用LLM支持
