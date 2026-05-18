@@ -1,0 +1,65 @@
+# CortexFlow
+# 基于Rust实现的CortexFlow - AI智能体调度框架
+
+[package]
+name = "cortex-flow"
+version = "0.1.0"
+edition = "2021"
+description = "CortexFlow - AI智能体调度框架，支持DAG编排和LLM集成"
+license = "MIT"
+authors = ["CortexFlow Team"]
+repository = "https://github.com/your-org/cortex-flow"
+readme = "README.md"
+rust-version = "1.70"
+
+[dependencies]
+# 异步运行时
+tokio = { version = "1.35", features = ["full"] }
+
+# 序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# 错误处理
+anyhow = "1.0"
+thiserror = "1.0"
+
+# 日志和追踪
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "json"] }
+
+# 异步trait支持
+async-trait = "0.1"
+
+# DAG任务调度引擎
+dagrs = "0.8"
+
+# LLM调用客户端
+async-openai = { version = "0.20", optional = true }
+
+# 配置管理
+config = "0.14"
+
+# 实用工具
+once_cell = "1.19"
+dashmap = "5.5"
+futures = "0.3"
+pin-project = "1.1"
+parking_lot = "0.12"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-stream = "0.3"
+num_cpus = "1.16"
+toml = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+tempfile = "3.8"
+
+[features]
+default = []
+# 启用LLM支持
+llm = ["async-openai"]
+# 启用性能追踪
+tracing_enabled = ["tracing"]
