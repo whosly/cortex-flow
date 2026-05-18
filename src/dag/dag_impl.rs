@@ -569,3 +569,218 @@ impl DAG {
         ascii
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dag::DAGBuilder;
+    use crate::task::{Task, TaskContext, TaskResult};
+
+    fn simple_task(name: &str) -> Arc<Task> {
+        Arc::new(Task::new(
+            name.to_string(),
+            name.to_string(),
+            move |_ctx: &TaskContext, _input: Option<serde_json::Value>| {
+                Box::pin(async move {
+                    Ok(TaskResult::success_with_output(
+                        serde_json::json!({"result": "ok"}),
+                    ))
+                })
+            },
+        ))
+    }
+
+    fn build_linear_dag() -> DAG {
+        let mut builder = DAGBuilder::new();
+        builder.add_task("a", "Task A", simple_task("a"));
+        builder.add_task("b", "Task B", simple_task("b"));
+        builder.add_task("c", "Task C", simple_task("c"));
+        builder.add_dependency("a", "b").unwrap();
+        builder.add_dependency("b", "c").unwrap();
+        builder.build().unwrap()
+    }
+
+    fn build_diamond_dag() -> DAG {
+        let mut builder = DAGBuilder::new();
+        builder.add_task("root", "Root Task", simple_task("root"));
+        builder.add_task("left", "Left Branch", simple_task("left"));
+        builder.add_task("right", "Right Branch", simple_task("right"));
+        builder.add_task("sink", "Sink Task", simple_task("sink"));
+        builder.add_dependency("root", "left").unwrap();
+        builder.add_dependency("root", "right").unwrap();
+        builder.add_dependency("left", "sink").unwrap();
+        builder.add_dependency("right", "sink").unwrap();
+        builder.build().unwrap()
+    }
+
+    fn build_single_node_dag() -> DAG {
+        let mut builder = DAGBuilder::new();
+        builder.add_task("only", "Only Task", simple_task("only"));
+        builder.build().unwrap()
+    }
+
+    // ---- to_dot tests ----
+
+    #[test]
+    fn test_to_dot_linear_dag() {
+        let dag = build_linear_dag();
+        let dot = dag.to_dot();
+
+        assert!(dot.starts_with("digraph DAG {"));
+        assert!(dot.contains("rankdir=TB"));
+        assert!(dot.contains("\"a\""));
+        assert!(dot.contains("\"b\""));
+        assert!(dot.contains("\"c\""));
+        assert!(dot.contains("\"a\" -> \"b\""));
+        assert!(dot.contains("\"b\" -> \"c\""));
+        assert!(dot.ends_with("}\n"));
+    }
+
+    #[test]
+    fn test_to_dot_diamond_dag() {
+        let dag = build_diamond_dag();
+        let dot = dag.to_dot();
+
+        assert!(dot.contains("\"root\" -> \"left\""));
+        assert!(dot.contains("\"root\" -> \"right\""));
+        assert!(dot.contains("\"left\" -> \"sink\""));
+        assert!(dot.contains("\"right\" -> \"sink\""));
+        // root is a root node → ellipse
+        assert!(dot.contains("shape=ellipse"));
+        // names should appear in labels
+        assert!(dot.contains("Root Task"));
+        assert!(dot.contains("Left Branch"));
+    }
+
+    #[test]
+    fn test_to_dot_single_node() {
+        let dag = build_single_node_dag();
+        let dot = dag.to_dot();
+
+        assert!(dot.contains("\"only\""));
+        assert!(dot.contains("Only Task"));
+        // no arrows
+        assert!(!dot.contains("->"));
+    }
+
+    #[test]
+    fn test_to_dot_escapes_special_chars() {
+        let mut builder = DAGBuilder::new();
+        builder.add_task("n1", "Task \"with quotes\"", simple_task("n1"));
+        builder.add_task("n2", "Task\nnewline", simple_task("n2"));
+        builder.add_dependency("n1", "n2").unwrap();
+        let dag = builder.build().unwrap();
+        let dot = dag.to_dot();
+
+        // escaped double quotes
+        assert!(dot.contains("\\\"with quotes\\\""));
+        // escaped newlines
+        assert!(dot.contains("\\nnewline"));
+    }
+
+    #[test]
+    fn test_to_dot_edge_labels() {
+        let mut builder = DAGBuilder::new();
+        builder.add_task("a", "A", simple_task("a"));
+        builder.add_task("b", "B", simple_task("b"));
+        builder.add_edge_with_label("a", "b", "condition_x").unwrap();
+        let dag = builder.build().unwrap();
+        let dot = dag.to_dot();
+
+        assert!(dot.contains("label=\"condition_x\""));
+    }
+
+    // ---- to_mermaid tests ----
+
+    #[test]
+    fn test_to_mermaid_linear_dag() {
+        let dag = build_linear_dag();
+        let mermaid = dag.to_mermaid();
+
+        assert!(mermaid.starts_with("```mermaid\n"));
+        assert!(mermaid.contains("flowchart LR"));
+        assert!(mermaid.contains("a --> b"));
+        assert!(mermaid.contains("b --> c"));
+        assert!(mermaid.ends_with("```\n"));
+    }
+
+    #[test]
+    fn test_to_mermaid_diamond_dag() {
+        let dag = build_diamond_dag();
+        let mermaid = dag.to_mermaid();
+
+        assert!(mermaid.contains("root --> left"));
+        assert!(mermaid.contains("root --> right"));
+        assert!(mermaid.contains("left --> sink"));
+        assert!(mermaid.contains("right --> sink"));
+    }
+
+    #[test]
+    fn test_to_mermaid_single_node() {
+        let dag = build_single_node_dag();
+        let mermaid = dag.to_mermaid();
+
+        assert!(mermaid.contains("only(Only Task)"));
+        // no arrows
+        assert!(!mermaid.contains("-->"));
+    }
+
+    // ---- to_ascii tests ----
+
+    #[test]
+    fn test_to_ascii_linear_dag() {
+        let dag = build_linear_dag();
+        let ascii = dag.to_ascii();
+
+        assert!(ascii.starts_with("DAG Structure:"));
+        assert!(ascii.contains("Nodes: 3"));
+        assert!(ascii.contains("Edges: 2"));
+        assert!(ascii.contains("Task A"));
+        assert!(ascii.contains("Task C"));
+    }
+
+    #[test]
+    fn test_to_ascii_diamond_dag() {
+        let dag = build_diamond_dag();
+        let ascii = dag.to_ascii();
+
+        assert!(ascii.contains("Nodes: 4"));
+        assert!(ascii.contains("Edges: 4"));
+        assert!(ascii.contains("Root Task"));
+        assert!(ascii.contains("Sink Task"));
+    }
+
+    #[test]
+    fn test_to_ascii_single_node() {
+        let dag = build_single_node_dag();
+        let ascii = dag.to_ascii();
+
+        assert!(ascii.contains("Nodes: 1"));
+        assert!(ascii.contains("Edges: 0"));
+    }
+
+    // ---- roundtrip / structural consistency ----
+
+    #[test]
+    fn test_dot_contains_all_nodes_and_edges() {
+        let dag = build_diamond_dag();
+        let dot = dag.to_dot();
+
+        // Every node id must appear
+        for id in &["root", "left", "right", "sink"] {
+            assert!(dot.contains(&format!("\"{}\"", id)), "missing node {}", id);
+        }
+        // Edge count: 4 arrows
+        let arrow_count = dot.matches("->").count();
+        assert_eq!(arrow_count, 4);
+    }
+
+    #[test]
+    fn test_mermaid_contains_all_edges() {
+        let dag = build_linear_dag();
+        let mermaid = dag.to_mermaid();
+
+        let arrow_count = mermaid.matches("-->").count();
+        assert_eq!(arrow_count, 2);
+    }
+}
