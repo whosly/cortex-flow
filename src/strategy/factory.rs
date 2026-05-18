@@ -1,7 +1,11 @@
 //! # 策略工厂
 
 use crate::error::{Error, Result};
-use crate::strategy::{OrchestrationStrategy, StrategyType, StrategyConfig, dag_strategy::DAGStrategy};
+use crate::strategy::{
+    OrchestrationStrategy, StrategyType, StrategyConfig,
+    dag_strategy::DAGStrategy,
+    sequential_strategy::SequentialStrategy,
+};
 
 /// 策略工厂 - 用于创建策略实例
 pub struct StrategyFactory;
@@ -11,7 +15,11 @@ impl StrategyFactory {
     pub fn create(strategy_type: StrategyType) -> Result<Box<dyn OrchestrationStrategy>> {
         match strategy_type {
             StrategyType::Dag => Ok(Box::new(DAGStrategy::default())),
-            _ => Err(Error::Strategy(format!("Strategy {:?} not yet implemented", strategy_type))),
+            StrategyType::Sequential => Ok(Box::new(SequentialStrategy::default())),
+            _ => Err(Error::Strategy(format!(
+                "Strategy {:?} not yet implemented. Available: Dag, Sequential",
+                strategy_type
+            ))),
         }
     }
 
@@ -22,7 +30,11 @@ impl StrategyFactory {
     ) -> Result<Box<dyn OrchestrationStrategy>> {
         match strategy_type {
             StrategyType::Dag => Ok(Box::new(DAGStrategy::new(config))),
-            _ => Err(Error::Strategy(format!("Strategy {:?} not yet implemented", strategy_type))),
+            StrategyType::Sequential => Ok(Box::new(SequentialStrategy::new(config))),
+            _ => Err(Error::Strategy(format!(
+                "Strategy {:?} not yet implemented. Available: Dag, Sequential",
+                strategy_type
+            ))),
         }
     }
 
@@ -34,5 +46,15 @@ impl StrategyFactory {
     /// 创建DAG策略（带配置）
     pub fn dag_strategy_with(config: StrategyConfig) -> Box<dyn OrchestrationStrategy> {
         Box::new(DAGStrategy::new(config))
+    }
+
+    /// 创建默认顺序策略
+    pub fn sequential_strategy() -> Box<dyn OrchestrationStrategy> {
+        Box::new(SequentialStrategy::default())
+    }
+
+    /// 创建顺序策略（带配置）
+    pub fn sequential_strategy_with(config: StrategyConfig) -> Box<dyn OrchestrationStrategy> {
+        Box::new(SequentialStrategy::new(config))
     }
 }

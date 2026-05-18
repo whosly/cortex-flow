@@ -30,10 +30,9 @@
 use std::sync::Arc;
 use crate::error::Result;
 use crate::context::ExecutionContext;
-use crate::dag::{DAG, NodeExecutionResult};
-use crate::strategy::{ExecutionResult, TaskExecutionResult, StrategyFactory};
+use crate::dag::{DAG, DAGBuilder, ExecutionProgress};
+use crate::strategy::ExecutionResult;
 use crate::execution::ExecutionEngine;
-use crate::dag::{DAGBuilder, DAGExecutor};
 use crate::task::TaskExecutor;
 use crate::config::{ConfigManager, FrameworkConfig};
 use crate::observability::{TracerImpl, MetricsCollector};
@@ -93,6 +92,47 @@ impl Orchestrator {
         dag_builder(&mut builder);
         let dag = builder.build()?;
         self.execute_dag_instance(dag).await
+    }
+
+    /// 执行 DAG（通过闭包构建，带进度回调）
+    ///
+    /// 与 `execute_dag` 类似，但额外支持进度回调。
+    /// 进度回调会在每个任务完成后被调用。
+    pub async fn execute_dag_with_progress<F, P>(&self, dag_builder: F, progress_callback: P) -> Result<ExecutionResult>
+    where
+        F: FnOnce(&mut DAGBuilder),
+        P: Fn(ExecutionProgress) + Send + Sync + 'static,
+    {
+        let mut builder = DAGBuilder::new();
+        dag_builder(&mut builder);
+        let dag = builder.build()?;
+        self.execute_dag_instance_with_progress(dag, progress_callback).await
+    }
+
+    /// 执行已构建的 DAG 实例（带进度回调）
+    pub async fn execute_dag_instance_with_progress<P>(&self, dag: DAG, progress_callback: P) -> Result<ExecutionResult>
+    where
+        P: Fn(ExecutionProgress) + Send + Sync + 'static,
+    {
+        dag.validate()?;
+        let mut ctx = ExecutionContext::new();
+        ctx.set("__dag__", &dag).ok();
+
+        let mut executor = dag.executor().with_progress_callback(progress_callback);
+        let results = executor.execute_all(&ctx).await?;
+
+        let success_count = results.iter().filter(|r| r.success).count();
+        let failure_count = results.len() - success_count;
+        let total_duration = results.iter().map(|r| r.duration_ms).sum::<u64>();
+
+        Ok(ExecutionResult {
+            success: failure_count == 0,
+            node_results: results,
+            total_duration_ms: total_duration,
+            start_time: chrono::Utc::now().timestamp_millis() - total_duration as i64,
+            end_time: chrono::Utc::now().timestamp_millis(),
+            error: if failure_count > 0 { Some(format!("{} tasks failed", failure_count)) } else { None },
+        })
     }
 
     /// 执行已构建的 DAG 实例

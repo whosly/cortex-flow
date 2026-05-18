@@ -12,6 +12,7 @@ pub mod strategy;
 pub mod dag;
 pub mod llm;
 pub mod orchestrator;
+pub mod error_recovery;
 
 // 重新导出常用类型
 pub use error::{Error, Result};
@@ -19,5 +20,6 @@ pub use task::{Task, TaskResult, TaskInput, TaskOutput, TaskExecutor};
 pub use context::ExecutionContext;
 pub use execution::ExecutionEngine;
 pub use strategy::{OrchestrationStrategy, StrategyFactory, StrategyType, ExecutionResult, TaskExecutionResult};
-pub use dag::{DAGBuilder, DAGNode, DAGEdge};
+pub use dag::{DAGBuilder, DAGNode, DAGEdge, ExecutionProgress, ProgressCallback};
 pub use orchestrator::Orchestrator;
+pub use error_recovery::{RetryPolicy, ErrorHandler, ErrorRecovery};

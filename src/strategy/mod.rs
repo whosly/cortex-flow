@@ -61,10 +61,12 @@ pub use strategy_trait::{
 pub use crate::execution::ExecutionPlan;
 pub use factory::StrategyFactory;
 pub use dag_strategy::DAGStrategy;
+pub use sequential_strategy::SequentialStrategy;
 
 mod strategy_trait;
 mod factory;
 mod dag_strategy;
+mod sequential_strategy;
 
 /// 编排策略类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

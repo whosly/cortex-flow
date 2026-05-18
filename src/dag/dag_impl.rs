@@ -4,10 +4,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
-use crate::context::ExecutionContext;
-use crate::task::TaskExecutor;
 use crate::execution::{ExecutionPlan, ExecutionNode};
-use super::{DAGNode, DAGEdge, NodeExecutionResult};
+use super::{DAGNode, DAGEdge};
 use super::executor::DAGExecutor;
 
 /// DAG（有向无环图）实现
@@ -448,5 +446,126 @@ impl DAG {
                 self.add_edge(edge.clone());
             }
         }
+    }
+
+    /// 导出为 DOT 格式（用于 Graphviz 可视化）
+    ///
+    /// 生成符合 Graphviz DOT 语言的图形描述，可用于可视化 DAG 结构。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,ignore
+    /// let dot = dag.to_dot();
+    /// std::fs::write("dag.dot", &dot)?;
+    /// // 使用 dot -Tpng dag.dot > dag.png 生成 PNG 图片
+    /// ```
+    pub fn to_dot(&self) -> String {
+        let mut dot = String::new();
+        dot.push_str("digraph DAG {\n");
+        dot.push_str("    rankdir=TB;\n");
+        dot.push_str("    node [shape=box, style=rounded];\n");
+        dot.push_str("    edge [arrowhead=normal];\n\n");
+
+        // 节点定义
+        for (id, node) in &self.nodes {
+            let escaped_name = node.name.replace('"', "\\\"").replace('\n', "\\n");
+            let label = if escaped_name != *id {
+                format!("{}\n({})", escaped_name, id)
+            } else {
+                escaped_name
+            };
+            let node_shape = if self.leaves().contains(&node) {
+                "box"
+            } else if self.roots().contains(&node) {
+                "ellipse"
+            } else {
+                "box"
+            };
+            dot.push_str(&format!(
+                "    \"{}\" [label=\"{}\", shape={}];\n",
+                id, label, node_shape
+            ));
+        }
+
+        dot.push('\n');
+
+        // 边定义
+        for edge in &self.edges {
+            let edge_label = edge
+                .label
+                .as_ref()
+                .map(|c| format!(" [label=\"{}\"]", c.replace('"', "\\\"")))
+                .unwrap_or_default();
+            dot.push_str(&format!("    \"{}\" -> \"{}\"{};\n", edge.from, edge.to, edge_label));
+        }
+
+        dot.push_str("\n}\n");
+        dot
+    }
+
+    /// 导出为 Mermaid 格式（用于文档）
+    ///
+    /// 生成符合 Mermaid 图语法的描述，可用于 GitHub README 等场景。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,ignore
+    /// let mermaid = dag.to_mermaid();
+    /// // 在 Markdown 中使用 ```mermaid 代码块
+    /// ```
+    pub fn to_mermaid(&self) -> String {
+        let mut md = String::new();
+        md.push_str("```mermaid\n");
+        md.push_str("flowchart LR\n");
+        md.push_str("    direction LR\n\n");
+
+        // 定义子图（按层级分组）
+        if let Ok(layers) = self.compute_layers() {
+            for (i, layer) in layers.iter().enumerate() {
+                md.push_str(&format!("    subgraph layer{} [{:?}]\n", i, format!("Layer {}", i)));
+                for node_id in layer {
+                    if let Some(node) = self.nodes.get(node_id) {
+                        md.push_str(&format!(
+                            "        {}({})\n",
+                            node_id,
+                            node.name.replace('"', "'")
+                        ));
+                    }
+                }
+                md.push_str("    end\n\n");
+            }
+        }
+
+        // 定义边
+        for edge in &self.edges {
+            md.push_str(&format!("    {} --> {}\n", edge.from, edge.to));
+        }
+
+        md.push_str("```\n");
+        md
+    }
+
+    /// 获取简短的图形化表示（用于控制台输出）
+    ///
+    /// 使用 ASCII 字符绘制 DAG 的简化视图。
+    pub fn to_ascii(&self) -> String {
+        let mut ascii = String::new();
+        ascii.push_str("DAG Structure:\n");
+        ascii.push_str(&format!("  Nodes: {}\n", self.node_count()));
+        ascii.push_str(&format!("  Edges: {}\n", self.edge_count()));
+        ascii.push_str(&format!("  Roots: {:?}\n", self.roots().iter().map(|n| n.name.as_str()).collect::<Vec<_>>()));
+        ascii.push_str(&format!("  Leaves: {:?}\n", self.leaves().iter().map(|n| n.name.as_str()).collect::<Vec<_>>()));
+        
+        if let Ok(layers) = self.compute_layers() {
+            ascii.push_str("\nLayers (nodes in same layer can execute in parallel):\n");
+            for (i, layer) in layers.iter().enumerate() {
+                let names: Vec<String> = layer.iter()
+                    .filter_map(|id| self.nodes.get(id))
+                    .map(|n| n.name.clone())
+                    .collect();
+                ascii.push_str(&format!("  Layer {}: {:?}\n", i, names));
+            }
+        }
+        ascii
     }
 }

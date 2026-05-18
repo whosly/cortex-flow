@@ -2,18 +2,13 @@
 //!
 //! 定义DAG编排相关的核心类型和构建器。
 
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use crate::error::{Error, Result};
-use crate::task::TaskExecutor;
 
 pub use node::DAGNode;
 pub use edge::DAGEdge;
 pub use dag_impl::DAG;
 pub use builder::DAGBuilder;
-pub use executor::DAGExecutor;
+pub use executor::{DAGExecutor, ExecutionProgress, ProgressCallback};
 
 mod node;
 mod edge;
@@ -22,7 +17,7 @@ mod builder;
 mod executor;
 
 /// DAG节点执行结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NodeExecutionResult {
     /// 节点ID
     pub task_id: String,

@@ -2,7 +2,7 @@
 //!
 //! 展示DAG中的并行执行能力
 
-use ai_agent_scheduler::{
+use cortex_flow::{
     Orchestrator,
     task::SimpleTask,
 };

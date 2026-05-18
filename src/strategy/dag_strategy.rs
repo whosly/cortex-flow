@@ -21,7 +21,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use crate::error::Result;
 use crate::context::ExecutionContext;
-use crate::dag::{DAG, DAGExecutor};
+use crate::dag::DAG;
 use crate::strategy::{OrchestrationStrategy, StrategyConfig, ExecutionResult};
 use crate::execution::ExecutionPlan;
 
