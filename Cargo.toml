@@ -8,7 +8,7 @@ edition = "2021"
 description = "CortexFlow - AI智能体调度框架，支持DAG编排和LLM集成"
 license = "MIT"
 authors = ["CortexFlow Team"]
-repository = "https://github.com/your-org/cortex-flow"
+repository = "https://github.com/whosly/cortex-flow"
 readme = "README.md"
 rust-version = "1.70"
 
