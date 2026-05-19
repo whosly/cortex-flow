@@ -1,12 +1,12 @@
 //! # DAG 实现
 
+use super::executor::DAGExecutor;
+use super::{DAGEdge, DAGNode};
+use crate::error::{Error, Result};
+use crate::execution::{ExecutionNode, ExecutionPlan};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use crate::error::{Error, Result};
-use crate::execution::{ExecutionPlan, ExecutionNode};
-use super::{DAGNode, DAGEdge};
-use super::executor::DAGExecutor;
 
 /// DAG（有向无环图）实现
 ///
@@ -59,8 +59,8 @@ impl DAG {
     pub fn add_node(&mut self, node: DAGNode) {
         let node_id = node.id.clone();
         self.nodes.insert(node_id.clone(), node);
-        self.adjacency.entry(node_id.clone()).or_insert_with(Vec::new);
-        self.reverse_adjacency.entry(node_id.clone()).or_insert_with(Vec::new);
+        self.adjacency.entry(node_id.clone()).or_default();
+        self.reverse_adjacency.entry(node_id.clone()).or_default();
         self.in_degree.entry(node_id).or_insert(0);
     }
 
@@ -74,19 +74,19 @@ impl DAG {
         }
 
         self.edges.push(edge.clone());
-        
+
         // 更新出边表
         self.adjacency
             .entry(edge.from.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge.to.clone());
-        
+
         // 更新入边表
         self.reverse_adjacency
             .entry(edge.to.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(edge.from.clone());
-        
+
         // 更新入度
         *self.in_degree.entry(edge.to.clone()).or_insert(0) += 1;
     }
@@ -148,7 +148,10 @@ impl DAG {
     pub fn leaves(&self) -> Vec<&DAGNode> {
         self.nodes
             .values()
-            .filter(|node| !self.adjacency.contains_key(&node.id) || self.adjacency.get(&node.id).map_or(true, |v| v.is_empty()))
+            .filter(|node| {
+                !self.adjacency.contains_key(&node.id)
+                    || self.adjacency.get(&node.id).map_or(true, |v| v.is_empty())
+            })
             .collect()
     }
 
@@ -156,11 +159,7 @@ impl DAG {
     pub fn successors(&self, node_id: &str) -> Vec<&DAGNode> {
         self.adjacency
             .get(node_id)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.nodes.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.nodes.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -168,11 +167,7 @@ impl DAG {
     pub fn predecessors(&self, node_id: &str) -> Vec<&DAGNode> {
         self.reverse_adjacency
             .get(node_id)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.nodes.get(id))
-                    .collect()
-            })
+            .map(|ids| ids.iter().filter_map(|id| self.nodes.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -236,11 +231,10 @@ impl DAG {
 
             if let Some(succs) = self.adjacency.get(node_id) {
                 for succ in succs {
-                    if !visited.contains(succ)
-                        && self.has_cycle_util(succ, visited, rec_stack)
+                    if rec_stack.contains(succ)
+                        || (!visited.contains(succ)
+                            && self.has_cycle_util(succ, visited, rec_stack))
                     {
-                        return true;
-                    } else if rec_stack.contains(succ) {
                         return true;
                     }
                 }
@@ -258,7 +252,13 @@ impl DAG {
         let mut cycle = Vec::new();
 
         for node_id in self.nodes.keys() {
-            if self.find_cycle_util(node_id, &mut visited, &mut rec_stack, &mut parent, &mut cycle) {
+            if self.find_cycle_util(
+                node_id,
+                &mut visited,
+                &mut rec_stack,
+                &mut parent,
+                &mut cycle,
+            ) {
                 return Some(cycle);
             }
         }
@@ -307,7 +307,9 @@ impl DAG {
     /// 计算拓扑排序（Kahn算法）
     pub fn topological_sort(&self) -> Result<Vec<String>> {
         if self.has_cycle() {
-            return Err(Error::DAGCycle("Cannot perform topological sort on DAG with cycle".to_string()));
+            return Err(Error::DAGCycle(
+                "Cannot perform topological sort on DAG with cycle".to_string(),
+            ));
         }
 
         let mut in_degree = self.in_degree.clone();
@@ -334,7 +336,9 @@ impl DAG {
         }
 
         if result.len() != self.nodes.len() {
-            return Err(Error::DAGCycle("Failed to compute topological order".to_string()));
+            return Err(Error::DAGCycle(
+                "Failed to compute topological order".to_string(),
+            ));
         }
         Ok(result)
     }
@@ -342,7 +346,9 @@ impl DAG {
     /// 计算层级（同一层节点可并行执行）
     pub fn compute_layers(&self) -> Result<Vec<Vec<String>>> {
         if self.has_cycle() {
-            return Err(Error::DAGCycle("Cannot compute layers for DAG with cycle".to_string()));
+            return Err(Error::DAGCycle(
+                "Cannot compute layers for DAG with cycle".to_string(),
+            ));
         }
 
         let mut layers: Vec<Vec<String>> = Vec::new();
@@ -358,7 +364,9 @@ impl DAG {
                 .collect();
 
             if layer.is_empty() {
-                return Err(Error::DAGCycle("Failed to compute layers - possible cycle".to_string()));
+                return Err(Error::DAGCycle(
+                    "Failed to compute layers - possible cycle".to_string(),
+                ));
             }
 
             // 标记为已处理并更新入度
@@ -390,10 +398,16 @@ impl DAG {
         }
         for edge in &self.edges {
             if !self.nodes.contains_key(&edge.from) {
-                return Err(Error::DAGValidation(format!("Source node not found: {}", edge.from)));
+                return Err(Error::DAGValidation(format!(
+                    "Source node not found: {}",
+                    edge.from
+                )));
             }
             if !self.nodes.contains_key(&edge.to) {
-                return Err(Error::DAGValidation(format!("Target node not found: {}", edge.to)));
+                return Err(Error::DAGValidation(format!(
+                    "Target node not found: {}",
+                    edge.to
+                )));
             }
         }
         if self.root_count() == 0 {
@@ -414,7 +428,8 @@ impl DAG {
         let layers = self.compute_layers()?;
         let layers_count = layers.len();
         let root_nodes = self.roots().iter().map(|n| n.id.clone()).collect();
-        let nodes: Vec<ExecutionNode> = order.iter()
+        let nodes: Vec<ExecutionNode> = order
+            .iter()
             .filter_map(|id| self.nodes.get(id))
             .map(|n| ExecutionNode {
                 id: n.id.clone(),
@@ -496,7 +511,10 @@ impl DAG {
                 .as_ref()
                 .map(|c| format!(" [label=\"{}\"]", c.replace('"', "\\\"")))
                 .unwrap_or_default();
-            dot.push_str(&format!("    \"{}\" -> \"{}\"{};\n", edge.from, edge.to, edge_label));
+            dot.push_str(&format!(
+                "    \"{}\" -> \"{}\"{};\n",
+                edge.from, edge.to, edge_label
+            ));
         }
 
         dot.push_str("\n}\n");
@@ -522,7 +540,11 @@ impl DAG {
         // 定义子图（按层级分组）
         if let Ok(layers) = self.compute_layers() {
             for (i, layer) in layers.iter().enumerate() {
-                md.push_str(&format!("    subgraph layer{} [{:?}]\n", i, format!("Layer {}", i)));
+                md.push_str(&format!(
+                    "    subgraph layer{} [{:?}]\n",
+                    i,
+                    format!("Layer {}", i)
+                ));
                 for node_id in layer {
                     if let Some(node) = self.nodes.get(node_id) {
                         md.push_str(&format!(
@@ -553,13 +575,26 @@ impl DAG {
         ascii.push_str("DAG Structure:\n");
         ascii.push_str(&format!("  Nodes: {}\n", self.node_count()));
         ascii.push_str(&format!("  Edges: {}\n", self.edge_count()));
-        ascii.push_str(&format!("  Roots: {:?}\n", self.roots().iter().map(|n| n.name.as_str()).collect::<Vec<_>>()));
-        ascii.push_str(&format!("  Leaves: {:?}\n", self.leaves().iter().map(|n| n.name.as_str()).collect::<Vec<_>>()));
-        
+        ascii.push_str(&format!(
+            "  Roots: {:?}\n",
+            self.roots()
+                .iter()
+                .map(|n| n.name.as_str())
+                .collect::<Vec<_>>()
+        ));
+        ascii.push_str(&format!(
+            "  Leaves: {:?}\n",
+            self.leaves()
+                .iter()
+                .map(|n| n.name.as_str())
+                .collect::<Vec<_>>()
+        ));
+
         if let Ok(layers) = self.compute_layers() {
             ascii.push_str("\nLayers (nodes in same layer can execute in parallel):\n");
             for (i, layer) in layers.iter().enumerate() {
-                let names: Vec<String> = layer.iter()
+                let names: Vec<String> = layer
+                    .iter()
                     .filter_map(|id| self.nodes.get(id))
                     .map(|n| n.name.clone())
                     .collect();

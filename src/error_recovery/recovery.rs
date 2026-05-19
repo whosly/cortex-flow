@@ -2,12 +2,12 @@
 //!
 //! 整合重试策略、错误处理器和补偿操作的统一管理器。
 
-use async_trait::async_trait;
-use crate::error::{Error, Result};
-use crate::context::ExecutionContext;
-use super::retry::RetryPolicy;
-use super::handler::{ErrorHandler, ErrorAction};
 use super::compensation::{Compensation, CompensationResult, NoOpCompensation};
+use super::handler::{ErrorAction, ErrorHandler};
+use super::retry::RetryPolicy;
+use crate::context::ExecutionContext;
+use crate::error::{Error, Result};
+use async_trait::async_trait;
 
 /// 错误恢复管理器
 ///
@@ -77,7 +77,10 @@ impl ErrorRecovery {
 
                     match handle_result.action {
                         ErrorAction::Retry => {
-                            if self.retry_policy.should_retry(attempt, Some(error.error_code())) {
+                            if self
+                                .retry_policy
+                                .should_retry(attempt, Some(error.error_code()))
+                            {
                                 let wait = self.retry_policy.wait_duration(attempt + 1);
                                 attempt += 1;
                                 tokio::time::sleep(wait).await;
@@ -130,7 +133,10 @@ impl ErrorRecovery {
 
                     match handle_result.action {
                         ErrorAction::Retry => {
-                            if self.retry_policy.should_retry(attempt, Some(error.error_code())) {
+                            if self
+                                .retry_policy
+                                .should_retry(attempt, Some(error.error_code()))
+                            {
                                 let wait = self.retry_policy.wait_duration(attempt + 1);
                                 attempt += 1;
                                 tokio::time::sleep(wait).await;
@@ -172,6 +178,7 @@ impl Default for ErrorRecovery {
 /// 可恢复执行 trait
 ///
 /// 为任务执行器提供错误恢复能力。
+#[allow(unused)]
 #[async_trait]
 pub trait RecoverableExecutor: Send + Sync {
     /// 带恢复机制的执行
@@ -220,9 +227,7 @@ mod tests {
         let mut recovery = ErrorRecovery::new(policy);
 
         let result: Result<String> = recovery
-            .execute_with_retry(|| async {
-                Err(Error::TaskExecution("always fails".to_string()))
-            })
+            .execute_with_retry(|| async { Err(Error::TaskExecution("always fails".to_string())) })
             .await;
 
         assert!(result.is_err());

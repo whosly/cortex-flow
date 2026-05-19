@@ -4,17 +4,17 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use node::DAGNode;
-pub use edge::DAGEdge;
-pub use dag_impl::DAG;
 pub use builder::DAGBuilder;
+pub use dag_impl::DAG;
+pub use edge::DAGEdge;
 pub use executor::{DAGExecutor, ExecutionProgress, ProgressCallback};
+pub use node::DAGNode;
 
-mod node;
-mod edge;
-mod dag_impl;
 mod builder;
+mod dag_impl;
+mod edge;
 mod executor;
+mod node;
 
 /// DAG节点执行结果
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,7 +39,12 @@ pub struct NodeExecutionResult {
 
 impl NodeExecutionResult {
     /// 创建成功结果
-    pub fn success(task_id: String, name: String, output: serde_json::Value, duration_ms: u64) -> Self {
+    pub fn success(
+        task_id: String,
+        name: String,
+        output: serde_json::Value,
+        duration_ms: u64,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp_millis();
         Self {
             task_id,

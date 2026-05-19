@@ -15,14 +15,17 @@
 //! - [`config`] - LLM 配置定义
 //! - [`message`] - 消息类型定义
 //! - [`response`] - 响应类型定义
+//! - [`token_tracker`] - Token 消耗追踪
 
 pub mod client;
 pub mod config;
 pub mod message;
 pub mod response;
+pub mod token_tracker;
 
 // 重新导出常用类型
-pub use self::client::{LLMClient, LLMClientTrait};
+pub use self::client::{LLMClient, LLMClientTrait, StreamChunk};
 pub use self::config::{LLMConfig, LLMProvider};
 pub use self::message::Message;
 pub use self::response::{LLMResponse, TokenUsage};
+pub use self::token_tracker::TokenTracker;

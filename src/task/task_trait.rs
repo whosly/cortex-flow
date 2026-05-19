@@ -40,11 +40,11 @@
 //! }
 //! ```
 
+use crate::context::ExecutionContext;
+use crate::error::Result;
+use crate::task::{TaskId, TaskOutput};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::error::Result;
-use crate::context::ExecutionContext;
-use crate::task::{TaskId, TaskOutput};
 
 /// 任务执行结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +115,7 @@ pub enum TaskStatus {
     Cancelled,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for TaskStatus {
     fn default() -> Self {
         Self::Pending
@@ -144,10 +145,10 @@ pub trait Task: Send + Sync {
 
     /// 获取任务ID
     fn id(&self) -> &str;
-    
+
     /// 获取任务名称
     fn name(&self) -> &str;
-    
+
     /// 获取任务描述
     fn description(&self) -> Option<&str> {
         None
@@ -174,14 +175,14 @@ pub trait Task: Send + Sync {
 /// 任务验证器trait
 pub trait TaskValidator: Send + Sync {
     type Input: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
-    
+
     fn validate(&self, input: &Self::Input) -> Result<()>;
 }
 
 /// 后处理器trait
 pub trait PostProcessor: Send + Sync {
     type Output: Send + Sync + serde::Serialize + serde::de::DeserializeOwned;
-    
+
     fn process(&self, output: Self::Output) -> Result<Self::Output>;
 }
 
@@ -197,10 +198,10 @@ pub trait TaskExecutor: Send + Sync {
 
     /// 获取任务ID
     fn task_id(&self) -> &str;
-    
+
     /// 获取任务名称
     fn task_name(&self) -> &str;
-    
+
     /// 获取任务描述
     fn task_description(&self) -> Option<&str> {
         None
@@ -231,11 +232,11 @@ impl TaskExecutor for EmptyTaskExecutor {
     fn task_id(&self) -> &str {
         "<placeholder>"
     }
-    
+
     fn task_name(&self) -> &str {
         "<Placeholder Task>"
     }
-    
+
     fn task_description(&self) -> Option<&str> {
         Some("Placeholder task executor for deserialization")
     }

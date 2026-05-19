@@ -23,12 +23,12 @@
 //! }).await;
 //! ```
 
-pub use retry::RetryPolicy;
-pub use handler::{ErrorHandler, ErrorAction};
 pub use compensation::{Compensation, CompensationResult};
+pub use handler::{ErrorAction, ErrorHandler};
 pub use recovery::ErrorRecovery;
+pub use retry::RetryPolicy;
 
-mod retry;
-mod handler;
 mod compensation;
+mod handler;
 mod recovery;
+mod retry;

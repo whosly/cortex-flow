@@ -9,8 +9,8 @@
 //! - [`TraceReport`] - 追踪报告
 //! - [`MetricsCollector`] / [`Metric`] - 指标收集
 
-pub use tracer::{Tracer, TracerImpl, Span, SpanStatus, SpanEvent, TraceReport};
-pub use metrics::{MetricsCollector, Metric, MetricType, MetricValue};
+pub use metrics::{Metric, MetricType, MetricValue, MetricsCollector};
+pub use tracer::{Span, SpanEvent, SpanStatus, TraceReport, Tracer, TracerImpl};
 
-mod tracer;
 mod metrics;
+mod tracer;

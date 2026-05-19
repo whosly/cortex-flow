@@ -2,10 +2,7 @@
 //!
 //! 展示带 tracing 和 metrics 的基本 DAG 任务编排
 
-use cortex_flow::{
-    Orchestrator,
-    task::SimpleTask,
-};
+use cortex_flow::{task::SimpleTask, Orchestrator};
 use serde_json::json;
 
 #[tokio::main]
@@ -54,9 +51,15 @@ async fn main() -> anyhow::Result<()> {
     let generate_task = SimpleTask::new("generate", "Result Generation", |input, ctx| {
         let ctx = ctx.clone();
         Box::pin(async move {
-            let processed = input.get("processed").and_then(|v| v.as_bool()).unwrap_or(false);
+            let processed = input
+                .get("processed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             let items = input.get("items").and_then(|v| v.as_u64()).unwrap_or(0);
-            println!("[generate] Generating result for {} items, processed={}", items, processed);
+            println!(
+                "[generate] Generating result for {} items, processed={}",
+                items, processed
+            );
             ctx.log_with_task("info", "Generating result", "generate");
             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             Ok(json!({
@@ -82,7 +85,11 @@ async fn main() -> anyhow::Result<()> {
         Ok(exec_result) => {
             println!("\n=== Execution Result ===");
             println!("Success: {}", exec_result.success);
-            let completed = exec_result.node_results.iter().filter(|r| r.success).count();
+            let completed = exec_result
+                .node_results
+                .iter()
+                .filter(|r| r.success)
+                .count();
             let failed = exec_result.node_results.len() - completed;
             println!("Tasks executed: {}", exec_result.node_results.len());
             println!("Tasks completed: {}", completed);

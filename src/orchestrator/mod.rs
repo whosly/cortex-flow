@@ -2,8 +2,9 @@
 //!
 //! 框架的门面组件，协调各组件工作。
 
-pub use orchestrator::Orchestrator;
 pub use builder::OrchestratorBuilder;
+pub use orchestrator::Orchestrator;
 
-mod orchestrator;
 mod builder;
+#[allow(clippy::module_inception)]
+mod orchestrator;

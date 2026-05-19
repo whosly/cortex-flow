@@ -11,13 +11,13 @@
 //! - [`ExecutionResult`] - 执行结果
 //! - [`TaskExecutionResult`] - 任务执行结果
 
+use crate::context::ExecutionContext;
+use crate::dag::{NodeExecutionResult, DAG};
+use crate::error::Result;
+use crate::execution::ExecutionPlan;
+use crate::task::TaskOutput;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::error::Result;
-use crate::context::ExecutionContext;
-use crate::dag::{DAG, NodeExecutionResult};
-use crate::task::TaskOutput;
-use crate::execution::ExecutionPlan;
 
 /// 策略配置
 ///
@@ -119,10 +119,10 @@ impl StrategyConfig {
 pub trait OrchestrationStrategy: Send + Sync {
     /// 获取策略名称
     fn name(&self) -> &str;
-    
+
     /// 获取策略配置
     fn config(&self) -> &StrategyConfig;
-    
+
     /// 执行编排
     ///
     /// 根据 DAG 和执行上下文执行编排。
@@ -136,7 +136,7 @@ pub trait OrchestrationStrategy: Send + Sync {
     ///
     /// - `Result<ExecutionResult>` - 执行结果
     async fn execute(&self, dag: &DAG, ctx: &ExecutionContext) -> Result<ExecutionResult>;
-    
+
     /// 验证 DAG 结构
     ///
     /// 检查 DAG 是否满足策略的执行要求。
@@ -149,7 +149,7 @@ pub trait OrchestrationStrategy: Send + Sync {
     ///
     /// - `Result<()>` - 验证成功返回 Ok
     fn validate(&self, dag: &DAG) -> Result<()>;
-    
+
     /// 创建执行计划
     ///
     /// 根据 DAG 创建执行计划，描述执行顺序和并行关系。
@@ -162,7 +162,7 @@ pub trait OrchestrationStrategy: Send + Sync {
     ///
     /// - `Result<ExecutionPlan>` - 执行计划
     fn plan(&self, dag: &DAG) -> Result<ExecutionPlan>;
-    
+
     /// 回滚执行（可选）
     ///
     /// 当执行失败时，回滚已完成的操作。
@@ -235,7 +235,11 @@ impl ExecutionResult {
     /// - `error`: 错误信息
     /// - `node_results`: 节点执行结果列表
     /// - `total_duration_ms`: 总执行时间
-    pub fn failure(error: String, node_results: Vec<NodeExecutionResult>, total_duration_ms: u64) -> Self {
+    pub fn failure(
+        error: String,
+        node_results: Vec<NodeExecutionResult>,
+        total_duration_ms: u64,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp_millis();
         Self {
             success: false,

@@ -1,7 +1,7 @@
 //! # 错误处理器
 
-use serde::{Deserialize, Serialize};
 use crate::error::Error;
+use serde::{Deserialize, Serialize};
 
 /// 错误处理动作
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

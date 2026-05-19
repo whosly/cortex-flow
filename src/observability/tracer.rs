@@ -12,10 +12,10 @@
 //!
 //! 当启用 `tracing_enabled` feature 时，追踪信息会同时输出到 tracing 生态。
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// 追踪器 Trait
@@ -64,6 +64,7 @@ pub enum SpanStatus {
     Error,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SpanStatus {
     fn default() -> Self {
         Self::Unset
@@ -152,7 +153,10 @@ impl TracerImpl {
 
     /// 开始一个 span（返回新 span）
     pub fn create_span(&self, name: impl Into<String>) -> Span {
-        let trace_id = self.current_trace_id.read().clone()
+        let trace_id = self
+            .current_trace_id
+            .read()
+            .clone()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
         Span::new(name, trace_id)
     }
@@ -187,7 +191,11 @@ impl TracerImpl {
     }
 
     /// 记录事件
-    pub fn record_event(&self, name: impl Into<String>, attributes: Option<HashMap<String, String>>) {
+    pub fn record_event(
+        &self,
+        name: impl Into<String>,
+        attributes: Option<HashMap<String, String>>,
+    ) {
         #[cfg(feature = "tracing_enabled")]
         {
             match &attributes {
@@ -214,7 +222,12 @@ impl TracerImpl {
 
     /// 获取指定名称的 spans
     pub fn spans_by_name(&self, name: &str) -> Vec<Span> {
-        self.spans.read().iter().filter(|s| s.name == name).cloned().collect()
+        self.spans
+            .read()
+            .iter()
+            .filter(|s| s.name == name)
+            .cloned()
+            .collect()
     }
 
     /// 清除所有 spans
@@ -231,10 +244,11 @@ impl TracerImpl {
     pub fn report(&self) -> TraceReport {
         let spans = self.spans.read();
         let total_spans = spans.len();
-        let error_spans = spans.iter().filter(|s| s.status == SpanStatus::Error).count();
-        let total_duration_ms: u64 = spans.iter()
-            .filter_map(|s| s.duration_ms)
-            .sum();
+        let error_spans = spans
+            .iter()
+            .filter(|s| s.status == SpanStatus::Error)
+            .count();
+        let total_duration_ms: u64 = spans.iter().filter_map(|s| s.duration_ms).sum();
 
         TraceReport {
             total_spans,

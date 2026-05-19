@@ -2,10 +2,7 @@
 //!
 //! 展示DAG中的并行执行能力
 
-use cortex_flow::{
-    Orchestrator,
-    task::SimpleTask,
-};
+use cortex_flow::{task::SimpleTask, Orchestrator};
 use serde_json::json;
 
 #[tokio::main]
@@ -43,7 +40,10 @@ async fn main() -> anyhow::Result<()> {
     let task_c = SimpleTask::new("C", "Generate Report", |input, ctx| {
         let ctx = ctx.clone();
         Box::pin(async move {
-            let processed = input.get("processed").map(|d| d.clone()).unwrap_or_default();
+            let processed = input
+                .get("processed")
+                .map(|d| d.clone())
+                .unwrap_or_default();
             println!("[C] Generating report from: {:?}", processed);
             ctx.log_with_task("info", "Generating report", "C");
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // 任务D: 发送通知 (依赖A) - 与B并行
-    let task_d = SimpleTask::new("D", "Send Notification", |input, ctx| {
+    let task_d = SimpleTask::new("D", "Send Notification", |_input, ctx| {
         let ctx = ctx.clone();
         Box::pin(async move {
             println!("[D] Sending notification...");
@@ -78,9 +78,12 @@ async fn main() -> anyhow::Result<()> {
     println!("\n执行结果:");
     println!("成功: {}", result.success);
     println!("执行任务数: {}", result.node_results.len());
-    
+
     for task in &result.node_results {
-        println!("  - {}: success={}, output={:?}", task.task_id, task.success, task.output);
+        println!(
+            "  - {}: success={}, output={:?}",
+            task.task_id, task.success, task.output
+        );
     }
 
     Ok(())

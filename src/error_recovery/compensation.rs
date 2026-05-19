@@ -2,8 +2,10 @@
 //!
 //! 定义任务执行失败时的补偿机制。
 
-use async_trait::async_trait;
+#![allow(dead_code)]
+
 use crate::context::ExecutionContext;
+use async_trait::async_trait;
 
 /// 补偿操作结果
 #[derive(Debug, Clone)]
@@ -72,10 +74,20 @@ impl Compensation for FnCompensation {
     }
 }
 
+/// 异步补偿函数类型
+type AsyncCompensationFn = Box<
+    dyn Fn(
+            &ExecutionContext,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = CompensationResult> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// 异步函数式补偿操作
 pub struct AsyncFnCompensation {
     name: String,
-    f: Box<dyn Fn(&ExecutionContext) -> std::pin::Pin<Box<dyn std::future::Future<Output = CompensationResult> + Send>> + Send + Sync>,
+    f: AsyncCompensationFn,
 }
 
 impl AsyncFnCompensation {
@@ -129,7 +141,10 @@ impl CompensationChain {
         let mut results = Vec::with_capacity(self.compensations.len());
         for comp in &self.compensations {
             let result = comp.compensate(ctx).await;
-            let should_continue = matches!(result, CompensationResult::Success | CompensationResult::Skipped);
+            let should_continue = matches!(
+                result,
+                CompensationResult::Success | CompensationResult::Skipped
+            );
             results.push(result);
             if !should_continue {
                 break;

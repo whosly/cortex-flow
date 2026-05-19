@@ -1,7 +1,7 @@
 //! # 配置模块
 
-pub use manager::ConfigManager;
 pub use framework_config::FrameworkConfig;
+pub use manager::ConfigManager;
 
-mod manager;
 mod framework_config;
+mod manager;

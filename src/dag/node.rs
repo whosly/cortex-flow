@@ -2,9 +2,9 @@
 //!
 //! 定义 DAG 中的节点类型。
 
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer, Serialize};
 use crate::task::TaskExecutor;
+use serde::{Deserialize, Deserializer, Serialize};
+use std::sync::Arc;
 
 /// DAG节点
 ///
@@ -91,11 +91,14 @@ impl<'de> Deserialize<'de> for DAGNode {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let id = seq.next_element()?
+                let id = seq
+                    .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-                let name = seq.next_element()?
+                let name = seq
+                    .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
-                let dependencies: Vec<String> = seq.next_element()?
+                let dependencies: Vec<String> = seq
+                    .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(2, &self))?;
                 let result: Option<serde_json::Value> = seq.next_element()?;
                 Ok(DAGNode {
@@ -143,7 +146,7 @@ impl<'de> Deserialize<'de> for DAGNode {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["id", "name", "dependencies", "result"];
+        const FIELDS: &[&str] = &["id", "name", "dependencies", "result"];
         deserializer.deserialize_struct("DAGNode", FIELDS, DAGNodeVisitor)
     }
 }
@@ -153,7 +156,7 @@ impl Clone for DAGNode {
         DAGNode {
             id: self.id.clone(),
             name: self.name.clone(),
-            task: Arc::clone(&self.task),  // 正确克隆 Arc<TaskExecutor>
+            task: Arc::clone(&self.task), // 正确克隆 Arc<TaskExecutor>
             dependencies: self.dependencies.clone(),
             result: self.result.clone(),
         }

@@ -20,13 +20,13 @@
 //! 3. **RollingBack** - 回滚阶段：处理失败回滚
 //! 4. **Completed** - 完成阶段：执行完成
 
+use crate::context::ExecutionContext;
+use crate::dag::DAG;
+use crate::error::{Error, Result};
+use crate::execution::{ExecutionPhase, ExecutionPlan, ExecutionState};
+use crate::strategy::{ExecutionResult, OrchestrationStrategy};
 use std::sync::Arc;
 use std::time::Instant;
-use crate::error::{Error, Result};
-use crate::context::ExecutionContext;
-use crate::strategy::{OrchestrationStrategy, ExecutionResult};
-use crate::execution::{ExecutionPlan, ExecutionState, ExecutionPhase};
-use crate::dag::DAG;
 
 /// 执行引擎
 ///
@@ -53,7 +53,8 @@ pub struct ExecutionEngine {
     strategy: Arc<dyn OrchestrationStrategy>,
     /// 执行状态
     state: ExecutionState,
-    /// DAG引用（可选）
+    /// DAG引用（可选，保留用于后续扩展）
+    #[allow(dead_code)]
     dag: Option<Arc<DAG>>,
 }
 
@@ -114,7 +115,7 @@ impl ExecutionEngine {
     ) -> Result<ExecutionResult> {
         let start_time = Instant::now();
         self.state.start();
-        
+
         // 验证阶段
         self.state.set_phase(ExecutionPhase::Validating);
         self.validate_plan(&plan).await?;
@@ -126,7 +127,7 @@ impl ExecutionEngine {
 
         // 从计划中提取 DAG（如果存在）
         let dag_opt = plan.dag().cloned();
-        
+
         // 执行阶段
         self.state.set_phase(ExecutionPhase::Executing);
         let result = if let Some(dag) = dag_opt.as_ref() {
@@ -138,7 +139,7 @@ impl ExecutionEngine {
                 start_time.elapsed().as_millis() as u64,
             ))
         };
-        
+
         // 完成
         self.state.finish();
 
@@ -147,7 +148,7 @@ impl ExecutionEngine {
             Err(e) => {
                 self.state.set_phase(ExecutionPhase::RollingBack);
                 // 转换 Option<&Arc<DAG>> 为 Option<&DAG>
-                let dag_ref = dag_opt.as_ref().map(|v| &**v);
+                let dag_ref = dag_opt.as_deref();
                 let _ = self.strategy.rollback(dag_ref, ctx).await;
                 Ok(ExecutionResult::failure(
                     e.to_string(),
@@ -166,10 +167,14 @@ impl ExecutionEngine {
     ///
     /// - `dag`: 要执行的 DAG
     /// - `ctx`: 执行上下文
-    pub async fn execute_dag(&mut self, dag: &DAG, ctx: &ExecutionContext) -> Result<ExecutionResult> {
+    pub async fn execute_dag(
+        &mut self,
+        dag: &DAG,
+        ctx: &ExecutionContext,
+    ) -> Result<ExecutionResult> {
         let start_time = Instant::now();
         self.state.start();
-        
+
         // 验证阶段
         self.state.set_phase(ExecutionPhase::Validating);
         dag.validate()?;
@@ -182,7 +187,7 @@ impl ExecutionEngine {
         // 执行阶段
         self.state.set_phase(ExecutionPhase::Executing);
         let result = self.strategy.execute(dag, ctx).await;
-        
+
         // 完成
         self.state.finish();
 

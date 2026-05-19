@@ -1,16 +1,21 @@
 //! # 配置管理器
 
-use crate::error::{Error, Result};
 use super::FrameworkConfig;
+use crate::error::{Error, Result};
 
 pub struct ConfigManager {
     framework: FrameworkConfig,
+    /// 配置文件路径（用于后续热更新）
+    #[allow(dead_code)]
     config_path: Option<String>,
 }
 
 impl ConfigManager {
     pub fn new() -> Self {
-        Self { framework: FrameworkConfig::default(), config_path: None }
+        Self {
+            framework: FrameworkConfig::default(),
+            config_path: None,
+        }
     }
 
     pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self> {
@@ -24,7 +29,10 @@ impl ConfigManager {
             serde_json::from_str(&content)?
         };
 
-        Ok(Self { framework, config_path: Some(path.to_string_lossy().to_string()) })
+        Ok(Self {
+            framework,
+            config_path: Some(path.to_string_lossy().to_string()),
+        })
     }
 
     pub fn from_env() -> Self {
@@ -41,7 +49,12 @@ impl ConfigManager {
     }
 
     pub fn load() -> Result<Self> {
-        for filename in ["ai_scheduler.toml", "ai_scheduler.json", "config.toml", "config.json"] {
+        for filename in [
+            "ai_scheduler.toml",
+            "ai_scheduler.json",
+            "config.toml",
+            "config.json",
+        ] {
             let path = std::path::Path::new(filename);
             if path.exists() {
                 return Self::from_file(path);

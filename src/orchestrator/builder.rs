@@ -2,15 +2,14 @@
 //!
 //! 提供 Orchestrator 的构建器模式实现。
 
-use std::sync::Arc;
-use crate::error::Result;
-use crate::execution::ExecutionEngine;
-use crate::strategy::{DAGStrategy, OrchestrationStrategy, StrategyConfig};
-use crate::config::{ConfigManager, FrameworkConfig};
-use crate::observability::{TracerImpl, MetricsCollector};
-use crate::llm::{LLMClient, LLMClientTrait};
-use crate::llm::config::LLMConfig;
 use super::Orchestrator;
+use crate::config::{ConfigManager, FrameworkConfig};
+use crate::error::Result;
+use crate::llm::config::LLMConfig;
+use crate::llm::{LLMClient, LLMClientTrait};
+use crate::observability::{MetricsCollector, TracerImpl};
+use crate::strategy::{StrategyConfig, StrategyRegistry};
+use std::sync::Arc;
 
 /// Orchestrator 构建器
 ///
@@ -98,21 +97,8 @@ impl OrchestratorBuilder {
 
     /// 构建 Orchestrator 实例
     pub async fn build(self) -> Result<Orchestrator> {
-        // 创建策略
-        let strategy: Arc<dyn OrchestrationStrategy> = Arc::new(
-            DAGStrategy::new(self.strategy_config)
-                .with_max_parallelism(self.max_parallelism)
-        );
-
-        // 创建执行引擎
-        let engine = ExecutionEngine::new(strategy);
-
-        // 创建上下文
-        let context = crate::context::ExecutionContext::new();
-
         // 创建配置管理器
         let mut config = ConfigManager::new();
-        // 如果有框架配置，更新它
         if let Some(fw_config) = self.framework_config {
             *config.framework_mut() = fw_config;
         }
@@ -124,17 +110,20 @@ impl OrchestratorBuilder {
         let metrics = MetricsCollector::new();
 
         // 创建 LLM 客户端（如果有配置）
-        let llm_client = self.llm_config.map(|cfg| {
-            Arc::new(LLMClient::new(cfg)) as Arc<dyn LLMClientTrait>
-        });
+        let llm_client = self
+            .llm_config
+            .map(|cfg| Arc::new(LLMClient::new(cfg)) as Arc<dyn LLMClientTrait>);
+
+        // 创建策略注册表
+        let strategy_registry = StrategyRegistry::new();
 
         Ok(Orchestrator {
-            engine,
-            context,
             config,
             tracer,
             metrics,
             llm_client,
+            strategy_registry,
+            max_parallelism: self.max_parallelism,
         })
     }
 }

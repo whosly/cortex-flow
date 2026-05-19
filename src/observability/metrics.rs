@@ -1,8 +1,8 @@
 //! # 指标收集器
 
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetricType {
@@ -19,7 +19,10 @@ pub struct MetricValue {
 
 impl MetricValue {
     pub fn new(value: f64) -> Self {
-        Self { value, labels: HashMap::new() }
+        Self {
+            value,
+            labels: HashMap::new(),
+        }
     }
 }
 

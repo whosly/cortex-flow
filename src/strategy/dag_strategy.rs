@@ -16,14 +16,14 @@
 //! 3. **执行阶段**: 按层级顺序执行任务
 //! 4. **汇总阶段**: 聚合所有节点执行结果
 
-use std::sync::Arc;
-use std::time::Instant;
-use async_trait::async_trait;
-use crate::error::Result;
 use crate::context::ExecutionContext;
 use crate::dag::DAG;
-use crate::strategy::{OrchestrationStrategy, StrategyConfig, ExecutionResult};
+use crate::error::Result;
 use crate::execution::ExecutionPlan;
+use crate::strategy::{ExecutionResult, OrchestrationStrategy, StrategyConfig};
+use async_trait::async_trait;
+use std::sync::Arc;
+use std::time::Instant;
 
 /// DAG 编排策略
 ///
@@ -95,19 +95,19 @@ impl OrchestrationStrategy for DAGStrategy {
     /// 同一层级的节点会并行执行。
     async fn execute(&self, dag: &DAG, ctx: &ExecutionContext) -> Result<ExecutionResult> {
         let start = Instant::now();
-        
+
         // 验证 DAG 有效性
         if let Err(e) = self.validate(dag) {
             return Ok(ExecutionResult::failure(
                 e.to_string(),
                 vec![],
-                start.elapsed().as_millis() as u64
+                start.elapsed().as_millis() as u64,
             ));
         }
 
         // 创建 DAG 执行器
         let mut executor = dag.executor();
-        
+
         // 执行所有节点
         let node_results = match executor.execute_all(ctx).await {
             Ok(results) => results,
@@ -115,7 +115,7 @@ impl OrchestrationStrategy for DAGStrategy {
                 return Ok(ExecutionResult::failure(
                     e.to_string(),
                     vec![],
-                    start.elapsed().as_millis() as u64
+                    start.elapsed().as_millis() as u64,
                 ));
             }
         };
@@ -156,13 +156,13 @@ impl OrchestrationStrategy for DAGStrategy {
     /// 计算 DAG 的拓扑排序和执行层级。
     fn plan(&self, dag: &DAG) -> Result<ExecutionPlan> {
         dag.validate()?;
-        
+
         // 计算拓扑排序
         let execution_order = dag.topological_sort()?;
-        
+
         // 计算执行层级（同一层可并行）
         let layers = dag.compute_layers()?;
-        
+
         // 估算执行时间
         // 注意：这是粗略估算，假设每层平均执行时间为 1000ms
         let estimated_duration_ms = if !layers.is_empty() {
@@ -172,7 +172,7 @@ impl OrchestrationStrategy for DAGStrategy {
         };
 
         Ok(ExecutionPlan::new(
-            Vec::new(),  // Plan 本身不包含完整节点信息
+            Vec::new(), // Plan 本身不包含完整节点信息
             dag.roots().iter().map(|n| n.id.clone()).collect(),
             execution_order,
         )

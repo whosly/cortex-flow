@@ -2,10 +2,7 @@
 //!
 //! 展示最基本的 DAG 任务编排
 
-use cortex_flow::{
-    Orchestrator,
-    task::SimpleTask,
-};
+use cortex_flow::{task::SimpleTask, Orchestrator};
 use serde_json::json;
 
 #[tokio::main]
@@ -14,9 +11,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 定义三个顺序执行的任务
     let task1 = SimpleTask::new("step1", "First Step", |_input, _ctx| {
-        Box::pin(async move {
-            Ok(json!({"value": 1}))
-        })
+        Box::pin(async move { Ok(json!({"value": 1})) })
     });
 
     let task2 = SimpleTask::new("step2", "Second Step", |input, _ctx| {

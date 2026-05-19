@@ -2,8 +2,8 @@
 //!
 //! 定义执行状态跟踪和管理。
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 执行状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,6 +15,7 @@ pub enum ExecutionStatus {
     Cancelled,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for ExecutionStatus {
     fn default() -> Self {
         Self::Pending
@@ -167,19 +168,23 @@ impl ExecutionState {
     }
 
     pub fn add_task(&mut self, task_id: String, name: String) {
-        self.task_states.insert(task_id.clone(), TaskState::new(task_id, name));
+        self.task_states
+            .insert(task_id.clone(), TaskState::new(task_id, name));
     }
 
     pub fn update_task(&mut self, task_id: String, status: ExecutionStatus) {
-        let state = self.task_states.entry(task_id.clone()).or_insert_with(|| TaskState {
-            task_id: task_id.clone(),
-            name: String::new(),
-            status: ExecutionStatus::Pending,
-            attempts: 0,
-            error: None,
-            start_time: None,
-            end_time: None,
-        });
+        let state = self
+            .task_states
+            .entry(task_id.clone())
+            .or_insert_with(|| TaskState {
+                task_id: task_id.clone(),
+                name: String::new(),
+                status: ExecutionStatus::Pending,
+                attempts: 0,
+                error: None,
+                start_time: None,
+                end_time: None,
+            });
         state.status = status;
     }
 
@@ -188,19 +193,31 @@ impl ExecutionState {
     }
 
     pub fn completed_count(&self) -> usize {
-        self.task_states.values().filter(|s| s.status == ExecutionStatus::Completed).count()
+        self.task_states
+            .values()
+            .filter(|s| s.status == ExecutionStatus::Completed)
+            .count()
     }
 
     pub fn failed_count(&self) -> usize {
-        self.task_states.values().filter(|s| s.status == ExecutionStatus::Failed).count()
+        self.task_states
+            .values()
+            .filter(|s| s.status == ExecutionStatus::Failed)
+            .count()
     }
 
     pub fn running_count(&self) -> usize {
-        self.task_states.values().filter(|s| s.status == ExecutionStatus::Running).count()
+        self.task_states
+            .values()
+            .filter(|s| s.status == ExecutionStatus::Running)
+            .count()
     }
 
     pub fn pending_count(&self) -> usize {
-        self.task_states.values().filter(|s| s.status == ExecutionStatus::Pending).count()
+        self.task_states
+            .values()
+            .filter(|s| s.status == ExecutionStatus::Pending)
+            .count()
     }
 
     pub fn total_count(&self) -> usize {
@@ -212,15 +229,17 @@ impl ExecutionState {
     }
 
     pub fn is_failed(&self) -> bool {
-        self.task_states.values().any(|s| s.status == ExecutionStatus::Failed)
+        self.task_states
+            .values()
+            .any(|s| s.status == ExecutionStatus::Failed)
     }
 
     pub fn all_completed(&self) -> bool {
-        self.task_states.values().all(|s| 
-            s.status == ExecutionStatus::Completed || 
-            s.status == ExecutionStatus::Failed ||
-            s.status == ExecutionStatus::Cancelled
-        )
+        self.task_states.values().all(|s| {
+            s.status == ExecutionStatus::Completed
+                || s.status == ExecutionStatus::Failed
+                || s.status == ExecutionStatus::Cancelled
+        })
     }
 
     pub fn duration_ms(&self) -> Option<u64> {

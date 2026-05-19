@@ -1,7 +1,7 @@
 //! # 任务元数据定义
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// 任务元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,7 +46,11 @@ impl TaskMetadata {
         self.tags.push(tag.into());
     }
 
-    pub fn with_property(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
+    pub fn with_property(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
         self.properties.insert(key.into(), value.into());
         self
     }

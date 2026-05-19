@@ -21,10 +21,10 @@
 //! println!("{}", response.content);
 //! ```
 
-use std::sync::Arc;
-use async_trait::async_trait;
+use super::{LLMConfig, LLMResponse, Message, TokenUsage};
 use crate::error::{Error, Result};
-use super::{LLMConfig, Message, LLMResponse, TokenUsage};
+use async_trait::async_trait;
+use std::sync::Arc;
 
 /// LLM客户端抽象接口
 #[async_trait]
@@ -33,7 +33,56 @@ pub trait LLMClientTrait: Send + Sync {
     async fn chat(&self, messages: Vec<Message>) -> Result<LLMResponse>;
 
     /// 发送带配置的聊天请求
-    async fn chat_with_config(&self, messages: Vec<Message>, config: &LLMConfig) -> Result<LLMResponse>;
+    async fn chat_with_config(
+        &self,
+        messages: Vec<Message>,
+        config: &LLMConfig,
+    ) -> Result<LLMResponse>;
+
+    /// 流式聊天请求
+    ///
+    /// 返回流式响应的 channel，调用者可以逐块接收响应内容。
+    /// 如果实现不支持流式，回退到普通 chat 并一次性返回完整结果。
+    async fn stream_chat(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<StreamChunk>>> {
+        // 默认实现：回退到普通 chat
+        let response = self.chat(messages).await?;
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
+        let _ = tx
+            .send(Ok(StreamChunk {
+                content: response.content,
+                finish_reason: response.finish_reason,
+                usage: Some(response.usage),
+            }))
+            .await;
+        Ok(rx)
+    }
+
+    /// 结构化输出聊天请求
+    ///
+    /// 调用 LLM 并将响应解析为指定类型。
+    /// 默认实现通过 JSON 反序列化完成。
+    async fn chat_structured<T: serde::de::DeserializeOwned>(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<T> {
+        let response = self.chat(messages).await?;
+        serde_json::from_str::<T>(&response.content)
+            .map_err(|e| Error::Serialization(format!("Failed to parse structured output: {}", e)))
+    }
+}
+
+/// 流式响应块
+#[derive(Debug, Clone)]
+pub struct StreamChunk {
+    /// 本块内容
+    pub content: String,
+    /// 完成原因（最后一个块有值）
+    pub finish_reason: Option<String>,
+    /// Token 使用统计（最后一个块有值）
+    pub usage: Option<TokenUsage>,
 }
 
 /// LLM 客户端实现
@@ -58,7 +107,9 @@ impl LLMClient {
 
     /// 创建默认客户端
     pub fn default_client() -> Self {
-        Self { config: LLMConfig::default() }
+        Self {
+            config: LLMConfig::default(),
+        }
     }
 
     /// 发送聊天请求
@@ -67,7 +118,57 @@ impl LLMClient {
     }
 
     /// 发送带配置的聊天请求
-    pub async fn chat_with_config(&self, messages: Vec<Message>, config: &LLMConfig) -> Result<LLMResponse> {
+    pub async fn chat_with_config(
+        &self,
+        messages: Vec<Message>,
+        config: &LLMConfig,
+    ) -> Result<LLMResponse> {
+        let max_retries = config.retries();
+        let timeout = config.timeout();
+        let mut last_error = None;
+
+        for attempt in 0..=max_retries {
+            if attempt > 0 {
+                let delay = std::time::Duration::from_millis(500 * attempt as u64);
+                tokio::time::sleep(delay).await;
+            }
+
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(timeout),
+                self.chat_inner(messages.clone(), config),
+            )
+            .await;
+
+            match result {
+                Ok(Ok(response)) => return Ok(response),
+                Ok(Err(e)) => {
+                    if e.is_recoverable() && attempt < max_retries {
+                        last_error = Some(e);
+                        continue;
+                    }
+                    return Err(e);
+                }
+                Err(_) => {
+                    let err = Error::Timeout(format!(
+                        "LLM request timed out after {}s (attempt {}/{})",
+                        timeout,
+                        attempt + 1,
+                        max_retries + 1
+                    ));
+                    if attempt < max_retries {
+                        last_error = Some(err);
+                        continue;
+                    }
+                    return Err(err);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| Error::LLMCall("All retries exhausted".to_string())))
+    }
+
+    /// 内部聊天实现
+    async fn chat_inner(&self, messages: Vec<Message>, config: &LLMConfig) -> Result<LLMResponse> {
         #[cfg(feature = "llm")]
         {
             self.chat_with_async_openai(messages, config).await
@@ -80,14 +181,15 @@ impl LLMClient {
 
     /// 使用 async-openai 库进行真实调用
     #[cfg(feature = "llm")]
-    async fn chat_with_async_openai(&self, messages: Vec<Message>, config: &LLMConfig) -> Result<LLMResponse> {
+    async fn chat_with_async_openai(
+        &self,
+        messages: Vec<Message>,
+        config: &LLMConfig,
+    ) -> Result<LLMResponse> {
         use async_openai::{
-            Client,
             config::OpenAIConfig,
-            types::{
-                ChatCompletionRequestMessage,
-                CreateChatCompletionRequest,
-            },
+            types::{ChatCompletionRequestMessage, CreateChatCompletionRequest},
+            Client,
         };
 
         let openai_config = if let Some(ref base_url) = config.base_url {
@@ -101,10 +203,8 @@ impl LLMClient {
         let client = Client::with_config(openai_config);
 
         // 转换消息格式
-        let chat_messages: Vec<ChatCompletionRequestMessage> = messages
-            .into_iter()
-            .map(|m| m.into())
-            .collect();
+        let chat_messages: Vec<ChatCompletionRequestMessage> =
+            messages.into_iter().map(|m| m.into()).collect();
 
         let mut request = CreateChatCompletionRequest {
             model: config.model.clone(),
@@ -119,23 +219,31 @@ impl LLMClient {
             request.temperature = Some(temperature);
         }
 
-        let response = client.chat().create(request).await
+        let response = client
+            .chat()
+            .create(request)
+            .await
             .map_err(|e| Error::LLMCall(format!("OpenAI API call failed: {}", e)))?;
 
         // 提取响应
-        let content = response.choices
+        let content = response
+            .choices
             .first()
             .and_then(|c| c.message.content.clone())
             .unwrap_or_default();
 
-        let usage = response.usage
+        let usage = response
+            .usage
             .map(|u| TokenUsage::new(u.prompt_tokens, u.completion_tokens))
             .unwrap_or_else(|| TokenUsage::new(0, 0));
 
         Ok(LLMResponse {
             content,
             model: response.model,
-            finish_reason: response.choices.first().and_then(|c| c.finish_reason.clone().map(|r| r.to_string())),
+            finish_reason: response
+                .choices
+                .first()
+                .and_then(|c| c.finish_reason.clone().map(|r| r.to_string())),
             usage,
             metadata: None,
         })
@@ -169,7 +277,11 @@ impl LLMClientTrait for LLMClient {
         self.chat(messages).await
     }
 
-    async fn chat_with_config(&self, messages: Vec<Message>, config: &LLMConfig) -> Result<LLMResponse> {
+    async fn chat_with_config(
+        &self,
+        messages: Vec<Message>,
+        config: &LLMConfig,
+    ) -> Result<LLMResponse> {
         self.chat_with_config(messages, config).await
     }
 }
@@ -220,7 +332,11 @@ impl LLMClientTrait for MockLLMClient {
         })
     }
 
-    async fn chat_with_config(&self, messages: Vec<Message>, _config: &LLMConfig) -> Result<LLMResponse> {
+    async fn chat_with_config(
+        &self,
+        messages: Vec<Message>,
+        _config: &LLMConfig,
+    ) -> Result<LLMResponse> {
         self.chat(messages).await
     }
 }
@@ -232,38 +348,34 @@ impl From<Message> for async_openai::types::ChatCompletionRequestMessage {
         use async_openai::types::ChatCompletionRequestMessage;
 
         match msg.role {
-            crate::llm::message::Role::System => {
-                ChatCompletionRequestMessage::System(
-                    async_openai::types::ChatCompletionRequestSystemMessage {
-                        content: msg.content,
-                        ..Default::default()
-                    }
-                )
-            }
-            crate::llm::message::Role::User => {
-                ChatCompletionRequestMessage::User(
-                    async_openai::types::ChatCompletionRequestUserMessage {
-                        content: async_openai::types::ChatCompletionRequestUserMessageContent::Text(msg.content),
-                        ..Default::default()
-                    }
-                )
-            }
-            crate::llm::message::Role::Assistant => {
-                ChatCompletionRequestMessage::Assistant(
-                    async_openai::types::ChatCompletionRequestAssistantMessage {
-                        content: Some(msg.content),
-                        ..Default::default()
-                    }
-                )
-            }
-            crate::llm::message::Role::Tool => {
-                ChatCompletionRequestMessage::Tool(
-                    async_openai::types::ChatCompletionRequestToolMessage {
-                        content: async_openai::types::ChatCompletionRequestToolMessageContent::Text(msg.content),
-                        tool_call_id: msg.tool_call_id.unwrap_or_default(),
-                    }
-                )
-            }
+            crate::llm::message::Role::System => ChatCompletionRequestMessage::System(
+                async_openai::types::ChatCompletionRequestSystemMessage {
+                    content: msg.content,
+                    ..Default::default()
+                },
+            ),
+            crate::llm::message::Role::User => ChatCompletionRequestMessage::User(
+                async_openai::types::ChatCompletionRequestUserMessage {
+                    content: async_openai::types::ChatCompletionRequestUserMessageContent::Text(
+                        msg.content,
+                    ),
+                    ..Default::default()
+                },
+            ),
+            crate::llm::message::Role::Assistant => ChatCompletionRequestMessage::Assistant(
+                async_openai::types::ChatCompletionRequestAssistantMessage {
+                    content: Some(msg.content),
+                    ..Default::default()
+                },
+            ),
+            crate::llm::message::Role::Tool => ChatCompletionRequestMessage::Tool(
+                async_openai::types::ChatCompletionRequestToolMessage {
+                    content: async_openai::types::ChatCompletionRequestToolMessageContent::Text(
+                        msg.content,
+                    ),
+                    tool_call_id: msg.tool_call_id.unwrap_or_default(),
+                },
+            ),
         }
     }
 }

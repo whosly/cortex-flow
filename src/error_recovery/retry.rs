@@ -96,7 +96,8 @@ impl RetryPolicy {
             // 简单抖动：随机 ±25%
             let range = (interval as f64 * 0.25) as u64;
             // 使用简单的伪随机（基于重试次数）
-            let pseudo_random = ((retry_count as u64).wrapping_mul(6364136223846793005) + 1) % (range * 2 + 1);
+            let pseudo_random =
+                ((retry_count as u64).wrapping_mul(6364136223846793005) + 1) % (range * 2 + 1);
             pseudo_random.saturating_sub(range)
         } else {
             0
@@ -164,8 +165,7 @@ mod tests {
 
     #[test]
     fn test_should_retry_with_error_code() {
-        let policy = RetryPolicy::fixed(3, 1000)
-            .with_retryable_codes(vec!["TIMEOUT".to_string()]);
+        let policy = RetryPolicy::fixed(3, 1000).with_retryable_codes(vec!["TIMEOUT".to_string()]);
         assert!(policy.should_retry(0, Some("TIMEOUT")));
         assert!(!policy.should_retry(0, Some("VALIDATION")));
     }

@@ -122,10 +122,7 @@ impl Error {
     pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
-            Error::TaskExecution(_) |
-            Error::Timeout(_) |
-            Error::LLMCall(_) |
-            Error::Resource(_)
+            Error::TaskExecution(_) | Error::Timeout(_) | Error::LLMCall(_) | Error::Resource(_)
         )
     }
 

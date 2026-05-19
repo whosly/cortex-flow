@@ -2,9 +2,8 @@
 
 use crate::error::{Error, Result};
 use crate::strategy::{
-    OrchestrationStrategy, StrategyType, StrategyConfig,
-    dag_strategy::DAGStrategy,
-    sequential_strategy::SequentialStrategy,
+    dag_strategy::DAGStrategy, sequential_strategy::SequentialStrategy, OrchestrationStrategy,
+    StrategyConfig, StrategyType,
 };
 
 /// 策略工厂 - 用于创建策略实例

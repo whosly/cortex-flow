@@ -39,17 +39,17 @@
 //! let results = executor.execute_all(&ctx).await?;
 //! ```
 
+use super::{NodeExecutionResult, DAG};
+use crate::context::ExecutionContext;
+use crate::error::{Error, Result};
+use crate::task::TaskExecutor;
+use futures::stream::{self, StreamExt};
+use parking_lot::RwLock as SyncRwLock;
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use parking_lot::RwLock as SyncRwLock;
-use futures::stream::{self, StreamExt};
-use crate::error::{Error, Result};
-use crate::context::ExecutionContext;
-use crate::task::TaskExecutor;
-use super::{DAG, NodeExecutionResult};
 
 /// DAG执行器状态
 #[derive(Debug, Default)]
@@ -185,7 +185,10 @@ impl DAGExecutor {
     }
 
     /// 执行所有节点
-    pub async fn execute_all(&mut self, ctx: &ExecutionContext) -> Result<Vec<NodeExecutionResult>> {
+    pub async fn execute_all(
+        &mut self,
+        ctx: &ExecutionContext,
+    ) -> Result<Vec<NodeExecutionResult>> {
         self.dag.validate()?;
 
         // 重置取消标志
@@ -195,16 +198,19 @@ impl DAGExecutor {
         let total_nodes = dag.node_count();
         let order = dag.topological_sort()?;
         let progress_callback = self.progress_callback.clone();
-        
+
         // 计算初始入度
-        let mut in_degree: HashMap<String, usize> = dag.get_edges().iter()
-            .fold(HashMap::new(), |mut acc, edge| {
-                *acc.entry(edge.to.clone()).or_insert(0) += 1;
-                acc
-            });
+        let mut in_degree: HashMap<String, usize> =
+            dag.get_edges()
+                .iter()
+                .fold(HashMap::new(), |mut acc, edge| {
+                    *acc.entry(edge.to.clone()).or_insert(0) += 1;
+                    acc
+                });
 
         // 找到所有根节点（入度为0的节点）
-        let mut ready_queue: VecDeque<String> = order.iter()
+        let mut ready_queue: VecDeque<String> = order
+            .iter()
             .filter(|id| !in_degree.contains_key(*id))
             .cloned()
             .collect();
@@ -242,21 +248,30 @@ impl DAGExecutor {
                     let ctx_clone = ctx.clone();
                     let node_id_clone = node_id.clone();
                     let cancelled_clone = Arc::clone(&cancelled);
-                    
+
                     // 收集上游节点的输出作为输入
                     let upstream_output = self.collect_upstream_output_sync(&node_id);
-                    
+
                     handles.push(async move {
                         // 检查取消状态后再执行
                         if cancelled_clone.load(Ordering::SeqCst) {
-                            return Err(Error::Cancelled("Execution was cancelled before task started".to_string()));
+                            return Err(Error::Cancelled(
+                                "Execution was cancelled before task started".to_string(),
+                            ));
                         }
-                        
+
                         // 直接获取 task 引用，避免克隆整个 DAGNode（会丢失 task）
                         if let Some(node) = dag_clone.get_node(&node_id_clone) {
                             let task = Arc::clone(&node.task);
                             let name = node.name.clone();
-                            Self::execute_single_node(node_id_clone, name, task, &ctx_clone, upstream_output).await
+                            Self::execute_single_node(
+                                node_id_clone,
+                                name,
+                                task,
+                                &ctx_clone,
+                                upstream_output,
+                            )
+                            .await
                         } else {
                             Err(Error::TaskNotFound(node_id_clone))
                         }
@@ -274,11 +289,13 @@ impl DAGExecutor {
             // 处理执行结果
             for result in results {
                 let node_id = result.task_id.clone();
-                
+
                 // 保存节点输出用于下游任务
                 if result.success {
                     if let Some(ref output) = result.output {
-                        self.node_outputs.write().insert(node_id.clone(), output.clone());
+                        self.node_outputs
+                            .write()
+                            .insert(node_id.clone(), output.clone());
                     }
                 }
 
@@ -318,7 +335,8 @@ impl DAGExecutor {
     /// 如果有多个上游，合并为一个 JSON 对象，key 为上游节点 ID。
     fn collect_upstream_output_sync(&self, node_id: &str) -> serde_json::Value {
         let dag = &self.dag;
-        let predecessors: Vec<String> = dag.predecessors(node_id)
+        let predecessors: Vec<String> = dag
+            .predecessors(node_id)
             .iter()
             .map(|n| n.id.clone())
             .collect();
@@ -360,11 +378,18 @@ impl DAGExecutor {
         match task.execute_task(input, ctx).await {
             Ok(output) => {
                 let duration = start_time.elapsed().as_millis() as u64;
-                Ok(NodeExecutionResult::success(task_id, name, output, duration))
+                Ok(NodeExecutionResult::success(
+                    task_id, name, output, duration,
+                ))
             }
             Err(e) => {
                 let duration = start_time.elapsed().as_millis() as u64;
-                Ok(NodeExecutionResult::failure(task_id, name, e.to_string(), duration))
+                Ok(NodeExecutionResult::failure(
+                    task_id,
+                    name,
+                    e.to_string(),
+                    duration,
+                ))
             }
         }
     }
@@ -384,7 +409,9 @@ impl DAGExecutor {
     /// 获取成功的结果
     pub async fn get_successful_results(&self) -> Vec<NodeExecutionResult> {
         let state = self.state.read().await;
-        state.results.values()
+        state
+            .results
+            .values()
             .filter(|r| r.success)
             .cloned()
             .collect()
@@ -393,7 +420,9 @@ impl DAGExecutor {
     /// 获取失败的结果
     pub async fn get_failed_results(&self) -> Vec<NodeExecutionResult> {
         let state = self.state.read().await;
-        state.results.values()
+        state
+            .results
+            .values()
             .filter(|r| !r.success)
             .cloned()
             .collect()

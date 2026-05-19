@@ -20,10 +20,10 @@
 //! - 包含节点 ID、名称和依赖关系
 //! - 包含任务的执行器引用
 
-use std::sync::Arc;
-use serde::{Deserialize, Deserializer, Serialize};
-use crate::task::{EmptyTaskExecutor, TaskExecutor};
 use crate::dag::DAG;
+use crate::task::{EmptyTaskExecutor, TaskExecutor};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::sync::Arc;
 
 /// 执行计划
 ///
@@ -210,9 +210,11 @@ impl<'de> Deserialize<'de> for ExecutionNode {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let id = seq.next_element()?
+                let id = seq
+                    .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-                let name = seq.next_element()?
+                let name = seq
+                    .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
                 let dependencies: Option<Vec<String>> = seq.next_element()?;
                 Ok(ExecutionNode {
@@ -254,7 +256,7 @@ impl<'de> Deserialize<'de> for ExecutionNode {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["id", "name", "dependencies"];
+        const FIELDS: &[&str] = &["id", "name", "dependencies"];
         deserializer.deserialize_struct("ExecutionNode", FIELDS, ExecutionNodeVisitor)
     }
 }

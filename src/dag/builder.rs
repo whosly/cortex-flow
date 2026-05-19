@@ -1,9 +1,9 @@
 //! # DAG Builder
 
-use std::sync::Arc;
+use crate::dag::{DAGEdge, DAGNode, DAG};
 use crate::error::Result;
 use crate::task::TaskExecutor;
-use crate::dag::{DAG, DAGNode, DAGEdge};
+use std::sync::Arc;
 
 /// DAG构建器
 pub struct DAGBuilder {
@@ -14,9 +14,7 @@ pub struct DAGBuilder {
 impl DAGBuilder {
     /// 创建新构建器
     pub fn new() -> Self {
-        Self {
-            dag: DAG::new(),
-        }
+        Self { dag: DAG::new() }
     }
 
     /// 添加节点

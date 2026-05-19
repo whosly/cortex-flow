@@ -12,6 +12,7 @@ pub enum LLMProvider {
     Custom,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for LLMProvider {
     fn default() -> Self {
         Self::OpenAI
@@ -159,9 +160,6 @@ impl LLMConfig {
 
 impl Default for LLMConfig {
     fn default() -> Self {
-        Self::openai(
-            std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-            "gpt-4",
-        )
+        Self::openai(std::env::var("OPENAI_API_KEY").unwrap_or_default(), "gpt-4")
     }
 }

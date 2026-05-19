@@ -8,9 +8,9 @@
 //! - [`TaskReport`] - 单个任务的执行报告
 //! - [`ReportGenerator`] - 报告生成器
 
-use serde::{Deserialize, Serialize};
 use crate::dag::NodeExecutionResult;
 use crate::strategy::ExecutionResult;
+use serde::{Deserialize, Serialize};
 
 /// 完整的执行报告
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,24 +65,30 @@ impl ReportGenerator {
         let succeeded = result.node_results.iter().filter(|r| r.success).count();
         let failed = result.node_results.len() - succeeded;
 
-        let tasks: Vec<TaskReport> = result.node_results.iter().map(|r| TaskReport {
-            task_id: r.task_id.clone(),
-            name: r.name.clone(),
-            success: r.success,
-            duration_ms: r.duration_ms,
-            error: r.error.clone(),
-            output_summary: r.output.as_ref().map(|o| {
-                let s = o.to_string();
-                if s.len() > 200 {
-                    format!("{}...", &s[..200])
-                } else {
-                    s
-                }
-            }),
-        }).collect();
+        let tasks: Vec<TaskReport> = result
+            .node_results
+            .iter()
+            .map(|r| TaskReport {
+                task_id: r.task_id.clone(),
+                name: r.name.clone(),
+                success: r.success,
+                duration_ms: r.duration_ms,
+                error: r.error.clone(),
+                output_summary: r.output.as_ref().map(|o| {
+                    let s = o.to_string();
+                    if s.len() > 200 {
+                        format!("{}...", &s[..200])
+                    } else {
+                        s
+                    }
+                }),
+            })
+            .collect();
 
         let error_summary = if failed > 0 {
-            let errors: Vec<String> = result.node_results.iter()
+            let errors: Vec<String> = result
+                .node_results
+                .iter()
                 .filter(|r| !r.success)
                 .filter_map(|r| r.error.clone())
                 .collect();
@@ -114,20 +120,28 @@ impl ReportGenerator {
 
         let now = chrono::Utc::now().timestamp_millis();
 
-        let tasks: Vec<TaskReport> = results.iter().map(|r| TaskReport {
-            task_id: r.task_id.clone(),
-            name: r.name.clone(),
-            success: r.success,
-            duration_ms: r.duration_ms,
-            error: r.error.clone(),
-            output_summary: r.output.as_ref().map(|o| {
-                let s = o.to_string();
-                if s.len() > 200 { format!("{}...", &s[..200]) } else { s }
-            }),
-        }).collect();
+        let tasks: Vec<TaskReport> = results
+            .iter()
+            .map(|r| TaskReport {
+                task_id: r.task_id.clone(),
+                name: r.name.clone(),
+                success: r.success,
+                duration_ms: r.duration_ms,
+                error: r.error.clone(),
+                output_summary: r.output.as_ref().map(|o| {
+                    let s = o.to_string();
+                    if s.len() > 200 {
+                        format!("{}...", &s[..200])
+                    } else {
+                        s
+                    }
+                }),
+            })
+            .collect();
 
         let error_summary = if failed > 0 {
-            let errors: Vec<String> = results.iter()
+            let errors: Vec<String> = results
+                .iter()
                 .filter(|r| !r.success)
                 .filter_map(|r| r.error.clone())
                 .collect();
@@ -158,12 +172,19 @@ impl std::fmt::Display for ExecutionReport {
         writeln!(f, "Report ID: {}", self.report_id)?;
         writeln!(f, "Success: {}", if self.success { "YES" } else { "NO" })?;
         writeln!(f, "Total Duration: {}ms", self.total_duration_ms)?;
-        writeln!(f, "Tasks: {} total, {} succeeded, {} failed, {} skipped",
-            self.total_tasks, self.succeeded_tasks, self.failed_tasks, self.skipped_tasks)?;
+        writeln!(
+            f,
+            "Tasks: {} total, {} succeeded, {} failed, {} skipped",
+            self.total_tasks, self.succeeded_tasks, self.failed_tasks, self.skipped_tasks
+        )?;
         writeln!(f, "--- Task Details ---")?;
         for task in &self.tasks {
             let status = if task.success { "OK" } else { "FAIL" };
-            writeln!(f, "  [{}] {} ({}) - {}ms", status, task.task_id, task.name, task.duration_ms)?;
+            writeln!(
+                f,
+                "  [{}] {} ({}) - {}ms",
+                status, task.task_id, task.name, task.duration_ms
+            )?;
             if let Some(ref error) = task.error {
                 writeln!(f, "    Error: {}", error)?;
             }

@@ -53,41 +53,41 @@ pub struct Message {
 impl Message {
     /// 创建系统消息
     pub fn system(content: impl Into<String>) -> Self {
-        Self { 
-            role: Role::System, 
-            content: content.into(), 
-            name: None, 
-            tool_call_id: None 
+        Self {
+            role: Role::System,
+            content: content.into(),
+            name: None,
+            tool_call_id: None,
         }
     }
 
     /// 创建用户消息
     pub fn user(content: impl Into<String>) -> Self {
-        Self { 
-            role: Role::User, 
-            content: content.into(), 
-            name: None, 
-            tool_call_id: None 
+        Self {
+            role: Role::User,
+            content: content.into(),
+            name: None,
+            tool_call_id: None,
         }
     }
 
     /// 创建助手消息
     pub fn assistant(content: impl Into<String>) -> Self {
-        Self { 
-            role: Role::Assistant, 
-            content: content.into(), 
-            name: None, 
-            tool_call_id: None 
+        Self {
+            role: Role::Assistant,
+            content: content.into(),
+            name: None,
+            tool_call_id: None,
         }
     }
 
     /// 创建工具消息
     pub fn tool(content: impl Into<String>, tool_call_id: impl Into<String>) -> Self {
-        Self { 
-            role: Role::Tool, 
-            content: content.into(), 
-            name: None, 
-            tool_call_id: Some(tool_call_id.into()) 
+        Self {
+            role: Role::Tool,
+            content: content.into(),
+            name: None,
+            tool_call_id: Some(tool_call_id.into()),
         }
     }
 
@@ -114,11 +114,11 @@ pub struct ChatRequest {
 impl ChatRequest {
     /// 创建新的聊天请求
     pub fn new(messages: Vec<Message>) -> Self {
-        Self { 
-            messages, 
-            model: None, 
-            max_tokens: None, 
-            temperature: None 
+        Self {
+            messages,
+            model: None,
+            max_tokens: None,
+            temperature: None,
         }
     }
 

@@ -8,14 +8,14 @@
 //! - **简单可靠**: 无并发问题，适合调试和简单场景
 //! - **错误即停**: 任一任务失败则停止后续执行
 
+use crate::context::ExecutionContext;
+use crate::dag::{DAGExecutor, DAG};
+use crate::error::Result;
+use crate::execution::ExecutionPlan;
+use crate::strategy::{ExecutionResult, OrchestrationStrategy, StrategyConfig};
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Instant;
-use async_trait::async_trait;
-use crate::error::Result;
-use crate::context::ExecutionContext;
-use crate::dag::{DAG, DAGExecutor};
-use crate::strategy::{OrchestrationStrategy, StrategyConfig, ExecutionResult};
-use crate::execution::ExecutionPlan;
 
 /// 顺序编排策略
 ///
@@ -120,20 +120,13 @@ impl OrchestrationStrategy for SequentialStrategy {
         let root_nodes = dag.roots().iter().map(|n| n.id.clone()).collect();
 
         // 顺序策略中每个层级只有一个节点
-        let layers: Vec<Vec<String>> = execution_order
-            .iter()
-            .map(|id| vec![id.clone()])
-            .collect();
+        let layers: Vec<Vec<String>> = execution_order.iter().map(|id| vec![id.clone()]).collect();
 
         let estimated_duration_ms = execution_order.len() as u64 * 1000;
 
-        Ok(ExecutionPlan::new(
-            Vec::new(),
-            root_nodes,
-            execution_order,
-        )
-        .with_dag(Arc::new(dag.clone()))
-        .with_layers(layers)
-        .with_estimated_duration(estimated_duration_ms))
+        Ok(ExecutionPlan::new(Vec::new(), root_nodes, execution_order)
+            .with_dag(Arc::new(dag.clone()))
+            .with_layers(layers)
+            .with_estimated_duration(estimated_duration_ms))
     }
 }

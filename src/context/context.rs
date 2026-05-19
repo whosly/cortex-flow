@@ -1,9 +1,9 @@
 //! # 执行上下文
 
+use chrono::Utc;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
-use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -42,7 +42,10 @@ impl ExecutionContext {
 
     pub fn get<T: for<'de> serde::Deserialize<'de>>(&self, key: impl Into<String>) -> Option<T> {
         let inner = self.inner.read();
-        inner.data.get(&key.into()).and_then(|v| serde_json::from_value(v.clone()).ok())
+        inner
+            .data
+            .get(&key.into())
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
     pub fn set<K, V>(&mut self, key: K, value: V) -> std::result::Result<(), crate::error::Error>
@@ -56,6 +59,31 @@ impl ExecutionContext {
         Ok(())
     }
 
+    /// 检查是否包含指定键
+    pub fn contains(&self, key: &str) -> bool {
+        self.inner.read().data.contains_key(key)
+    }
+
+    /// 删除指定键
+    pub fn remove(&self, key: &str) -> Option<serde_json::Value> {
+        self.inner.write().data.remove(key)
+    }
+
+    /// 获取所有键
+    pub fn keys(&self) -> Vec<String> {
+        self.inner.read().data.keys().cloned().collect()
+    }
+
+    /// 获取数据项数量
+    pub fn len(&self) -> usize {
+        self.inner.read().data.len()
+    }
+
+    /// 检查是否为空
+    pub fn is_empty(&self) -> bool {
+        self.inner.read().data.is_empty()
+    }
+
     pub fn log(&mut self, level: impl Into<String>, message: impl Into<String>) {
         let mut inner = self.inner.write();
         inner.logs.push(ContextLog {
@@ -66,7 +94,12 @@ impl ExecutionContext {
         });
     }
 
-    pub fn log_with_task(&self, level: impl Into<String>, message: impl Into<String>, task_id: impl Into<String>) {
+    pub fn log_with_task(
+        &self,
+        level: impl Into<String>,
+        message: impl Into<String>,
+        task_id: impl Into<String>,
+    ) {
         let mut inner = self.inner.write();
         inner.logs.push(ContextLog {
             timestamp: Utc::now(),
@@ -78,6 +111,60 @@ impl ExecutionContext {
 
     pub fn logs(&self) -> Vec<ContextLog> {
         self.inner.read().logs.clone()
+    }
+
+    /// 创建上下文快照
+    ///
+    /// 返回当前上下文数据的快照，可用于后续恢复。
+    pub fn snapshot(&self) -> ContextSnapshot {
+        let inner = self.inner.read();
+        ContextSnapshot {
+            session_id: inner.session_id.clone(),
+            data: inner.data.clone(),
+            log_count: inner.logs.len(),
+        }
+    }
+
+    /// 从快照恢复上下文
+    ///
+    /// 用快照中的数据替换当前上下文数据。
+    /// 注意：日志不会被恢复。
+    pub fn restore(&mut self, snapshot: &ContextSnapshot) {
+        let mut inner = self.inner.write();
+        inner.session_id = snapshot.session_id.clone();
+        inner.data = snapshot.data.clone();
+    }
+
+    /// 清除所有数据
+    pub fn clear(&mut self) {
+        let mut inner = self.inner.write();
+        inner.data.clear();
+        inner.logs.clear();
+    }
+}
+
+/// 上下文快照
+///
+/// 保存上下文在某个时刻的数据状态，可用于恢复。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ContextSnapshot {
+    /// 会话ID
+    pub session_id: String,
+    /// 数据快照
+    pub data: HashMap<String, serde_json::Value>,
+    /// 快照时的日志条数
+    pub log_count: usize,
+}
+
+impl ContextSnapshot {
+    /// 获取快照中的数据项数量
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// 检查快照是否为空
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 }
 

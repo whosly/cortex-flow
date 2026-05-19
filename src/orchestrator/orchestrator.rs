@@ -27,22 +27,22 @@
 //! }).await?;
 //! ```
 
-use std::sync::Arc;
-use crate::error::Result;
-use crate::context::ExecutionContext;
-use crate::dag::{DAG, DAGBuilder, ExecutionProgress};
-use crate::strategy::ExecutionResult;
-use crate::execution::ExecutionEngine;
-use crate::task::TaskExecutor;
-use crate::config::{ConfigManager, FrameworkConfig};
-use crate::observability::{TracerImpl, MetricsCollector};
-use crate::llm::LLMClientTrait;
 use super::OrchestratorBuilder;
+use crate::config::{ConfigManager, FrameworkConfig};
+use crate::context::ExecutionContext;
+use crate::dag::{DAGBuilder, ExecutionProgress, DAG};
+use crate::error::Result;
+use crate::llm::LLMClientTrait;
+use crate::observability::{MetricsCollector, TracerImpl};
+use crate::strategy::ExecutionResult;
+use crate::strategy::StrategyRegistry;
+use crate::task::TaskExecutor;
+use std::sync::Arc;
 
 /// Orchestrator 是编排框架的核心门面类
 ///
 /// 提供统一的任务编排入口，管理执行引擎、配置、追踪和指标收集。
-/// 
+///
 /// # 设计原则
 ///
 /// - **门面模式**: 隐藏内部复杂性，提供简洁的API
@@ -58,18 +58,19 @@ use super::OrchestratorBuilder;
 ///     .await?;
 /// ```
 pub struct Orchestrator {
-    /// 执行引擎 - 负责实际的任务调度和执行
-    pub(crate) engine: ExecutionEngine,
-    /// 执行上下文 - 存储执行过程中的共享数据
-    pub(crate) context: ExecutionContext,
-    /// 配置管理器 - 管理框架配置
+    /// 配置管理器
     pub(crate) config: ConfigManager,
-    /// 追踪器 - 记录执行过程中的调用链
+    /// 追踪器
     pub(crate) tracer: TracerImpl,
-    /// 指标收集器 - 收集执行指标
+    /// 指标收集器
     pub(crate) metrics: MetricsCollector,
-    /// LLM客户端（可选）- 用于AI相关任务
+    /// LLM客户端（可选）
     pub(crate) llm_client: Option<Arc<dyn LLMClientTrait>>,
+    /// 策略注册表
+    pub(crate) strategy_registry: StrategyRegistry,
+    /// 最大并发数
+    #[allow(dead_code)]
+    pub(crate) max_parallelism: usize,
 }
 
 impl Orchestrator {
@@ -98,7 +99,11 @@ impl Orchestrator {
     ///
     /// 与 `execute_dag` 类似，但额外支持进度回调。
     /// 进度回调会在每个任务完成后被调用。
-    pub async fn execute_dag_with_progress<F, P>(&self, dag_builder: F, progress_callback: P) -> Result<ExecutionResult>
+    pub async fn execute_dag_with_progress<F, P>(
+        &self,
+        dag_builder: F,
+        progress_callback: P,
+    ) -> Result<ExecutionResult>
     where
         F: FnOnce(&mut DAGBuilder),
         P: Fn(ExecutionProgress) + Send + Sync + 'static,
@@ -106,11 +111,16 @@ impl Orchestrator {
         let mut builder = DAGBuilder::new();
         dag_builder(&mut builder);
         let dag = builder.build()?;
-        self.execute_dag_instance_with_progress(dag, progress_callback).await
+        self.execute_dag_instance_with_progress(dag, progress_callback)
+            .await
     }
 
     /// 执行已构建的 DAG 实例（带进度回调）
-    pub async fn execute_dag_instance_with_progress<P>(&self, dag: DAG, progress_callback: P) -> Result<ExecutionResult>
+    pub async fn execute_dag_instance_with_progress<P>(
+        &self,
+        dag: DAG,
+        progress_callback: P,
+    ) -> Result<ExecutionResult>
     where
         P: Fn(ExecutionProgress) + Send + Sync + 'static,
     {
@@ -131,15 +141,16 @@ impl Orchestrator {
             total_duration_ms: total_duration,
             start_time: chrono::Utc::now().timestamp_millis() - total_duration as i64,
             end_time: chrono::Utc::now().timestamp_millis(),
-            error: if failure_count > 0 { Some(format!("{} tasks failed", failure_count)) } else { None },
+            error: if failure_count > 0 {
+                Some(format!("{} tasks failed", failure_count))
+            } else {
+                None
+            },
         })
     }
 
     /// 执行已构建的 DAG 实例
-    ///
-    /// 执行一个预先构建好的 DAG，接受任意的 DAG 实例。
-    /// 方法会先验证 DAG 的有效性，然后执行所有节点。
-    async fn execute_dag_instance(&self, dag: DAG) -> Result<ExecutionResult> {
+    pub async fn execute_dag_instance(&self, dag: DAG) -> Result<ExecutionResult> {
         dag.validate()?;
         let mut ctx = ExecutionContext::new();
         ctx.set("__dag__", &dag).ok();
@@ -157,7 +168,11 @@ impl Orchestrator {
             total_duration_ms: total_duration,
             start_time: chrono::Utc::now().timestamp_millis() - total_duration as i64,
             end_time: chrono::Utc::now().timestamp_millis(),
-            error: if failure_count > 0 { Some(format!("{} tasks failed", failure_count)) } else { None },
+            error: if failure_count > 0 {
+                Some(format!("{} tasks failed", failure_count))
+            } else {
+                None
+            },
         })
     }
 
@@ -196,6 +211,16 @@ impl Orchestrator {
     /// 获取 LLM 客户端（如果配置了）
     pub fn llm_client(&self) -> Option<&Arc<dyn LLMClientTrait>> {
         self.llm_client.as_ref()
+    }
+
+    /// 获取策略注册表
+    pub fn strategy_registry(&self) -> &StrategyRegistry {
+        &self.strategy_registry
+    }
+
+    /// 获取策略注册表（可变引用）
+    pub fn strategy_registry_mut(&mut self) -> &mut StrategyRegistry {
+        &mut self.strategy_registry
     }
 
     /// 设置 LLM 客户端

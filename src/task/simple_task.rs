@@ -27,19 +27,20 @@
 //! });
 //! ```
 
-use async_trait::async_trait;
-use serde_json::Value;
-use std::sync::Arc;
-use std::pin::Pin;
-use std::future::Future;
 use crate::context::ExecutionContext;
 use crate::error::Result;
 use crate::task::TaskExecutor;
+use async_trait::async_trait;
+use serde_json::Value;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 
 /// 简单任务函数类型
 pub type SimpleTaskFn = Arc<
     dyn Fn(Value, &ExecutionContext) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
-        + Send + Sync,
+        + Send
+        + Sync,
 >;
 
 /// 简单任务 - 无需定义泛型类型的任务实现
@@ -62,7 +63,9 @@ impl SimpleTask {
         I: Into<String>,
         N: Into<String>,
         F: Fn(Value, &ExecutionContext) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
-            + Send + Sync + 'static,
+            + Send
+            + Sync
+            + 'static,
     {
         Self {
             id: id.into(),
@@ -79,7 +82,9 @@ impl SimpleTask {
         N: Into<String>,
         D: Into<String>,
         F: Fn(Value, &ExecutionContext) -> Pin<Box<dyn Future<Output = Result<Value>> + Send>>
-            + Send + Sync + 'static,
+            + Send
+            + Sync
+            + 'static,
     {
         Self {
             id: id.into(),
@@ -169,11 +174,7 @@ impl From<SimpleTask> for Arc<dyn TaskExecutor> {
 #[macro_export]
 macro_rules! simple_task {
     ($id:expr, $name:expr, $body:expr) => {
-        $crate::task::SimpleTask::new($id, $name, |_input, _ctx| {
-            Box::pin(async move {
-                $body
-            })
-        })
+        $crate::task::SimpleTask::new($id, $name, |_input, _ctx| Box::pin(async move { $body }))
     };
 }
 
@@ -182,9 +183,7 @@ macro_rules! simple_task {
 macro_rules! named_task {
     ($id:expr, $name:expr, $desc:expr, $body:expr) => {
         $crate::task::SimpleTask::with_description($id, $name, $desc, |_input, _ctx| {
-            Box::pin(async move {
-                $body
-            })
+            Box::pin(async move { $body })
         })
     };
 }

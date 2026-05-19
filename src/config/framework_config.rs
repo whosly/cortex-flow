@@ -1,12 +1,12 @@
 //! # 框架配置
 
-use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
-use crate::strategy::StrategyType;
 use crate::llm::LLMConfig;
+use crate::strategy::StrategyType;
+use serde::{Deserialize, Serialize};
 
 /// 框架配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FrameworkConfig {
     /// 执行配置
     pub execution: ExecutionConfig,
@@ -24,14 +24,20 @@ impl FrameworkConfig {
     /// 验证配置
     pub fn validate(&self) -> Result<()> {
         if self.execution.max_workers == 0 {
-            return Err(Error::Config("max_workers must be greater than 0".to_string()));
+            return Err(Error::Config(
+                "max_workers must be greater than 0".to_string(),
+            ));
         }
         if self.execution.max_workers > 1000 {
-            return Err(Error::Config("max_workers exceeds maximum limit (1000)".to_string()));
+            return Err(Error::Config(
+                "max_workers exceeds maximum limit (1000)".to_string(),
+            ));
         }
         if let Some(ref timeout) = self.execution.default_timeout {
             if *timeout == 0 {
-                return Err(Error::Config("default_timeout must be greater than 0".to_string()));
+                return Err(Error::Config(
+                    "default_timeout must be greater than 0".to_string(),
+                ));
             }
         }
         Ok(())
@@ -40,11 +46,11 @@ impl FrameworkConfig {
     /// 从文件加载配置
     pub fn from_file(path: &str) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        Self::from_str(&content)
+        Self::parse(&content)
     }
 
     /// 从字符串解析配置
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse(s: &str) -> Result<Self> {
         // 尝试TOML格式
         if let Ok(config) = toml::from_str::<Self>(s) {
             return Ok(config);
@@ -61,18 +67,6 @@ impl FrameworkConfig {
         let content = toml::to_string_pretty(self)?;
         std::fs::write(path, content)?;
         Ok(())
-    }
-}
-
-impl Default for FrameworkConfig {
-    fn default() -> Self {
-        Self {
-            execution: ExecutionConfig::default(),
-            logging: LoggingConfig::default(),
-            llm: None,
-            strategy: StrategyConfig::default(),
-            observability: ObservabilityConfig::default(),
-        }
     }
 }
 
@@ -135,10 +129,10 @@ pub struct LoggingConfig {
 
 impl Default for LoggingConfig {
     fn default() -> Self {
-        Self { 
-            level: "info".to_string(), 
-            format: "json".to_string(), 
-            target: None 
+        Self {
+            level: "info".to_string(),
+            format: "json".to_string(),
+            target: None,
         }
     }
 }
@@ -174,9 +168,9 @@ pub struct StrategyConfig {
 
 impl Default for StrategyConfig {
     fn default() -> Self {
-        Self { 
-            default_type: StrategyType::Dag, 
-            dag: None 
+        Self {
+            default_type: StrategyType::Dag,
+            dag: None,
         }
     }
 }
@@ -208,10 +202,10 @@ pub struct DAGConfig {
 
 impl Default for DAGConfig {
     fn default() -> Self {
-        Self { 
-            max_nodes: Some(1000), 
-            parallel: true, 
-            max_parallelism: Some(10) 
+        Self {
+            max_nodes: Some(1000),
+            parallel: true,
+            max_parallelism: Some(10),
         }
     }
 }
@@ -245,10 +239,10 @@ pub struct ObservabilityConfig {
 
 impl Default for ObservabilityConfig {
     fn default() -> Self {
-        Self { 
-            tracing: true, 
-            metrics: true, 
-            tracing_sample_rate: 1.0 
+        Self {
+            tracing: true,
+            metrics: true,
+            tracing_sample_rate: 1.0,
         }
     }
 }

@@ -47,26 +47,25 @@
 //! | Hierarchical | 层级策略，支持嵌套 DAG |
 //! | ProducerChecker | 生产者-检查者策略 |
 
-use serde::{Deserialize, Serialize};
 use crate::error::Error;
+use serde::{Deserialize, Serialize};
 
 // 导出核心类型
 pub use strategy_trait::{
-    OrchestrationStrategy,
-    StrategyConfig,
-    ExecutionResult,
-    TaskExecutionResult,
+    ExecutionResult, OrchestrationStrategy, StrategyConfig, TaskExecutionResult,
 };
 // 从 execution 模块重新导出 ExecutionPlan
 pub use crate::execution::ExecutionPlan;
-pub use factory::StrategyFactory;
 pub use dag_strategy::DAGStrategy;
+pub use factory::StrategyFactory;
+pub use registry::StrategyRegistry;
 pub use sequential_strategy::SequentialStrategy;
 
-mod strategy_trait;
-mod factory;
 mod dag_strategy;
+mod factory;
+mod registry;
 mod sequential_strategy;
+mod strategy_trait;
 
 /// 编排策略类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -85,6 +84,7 @@ pub enum StrategyType {
     ProducerChecker,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for StrategyType {
     fn default() -> Self {
         Self::Dag
