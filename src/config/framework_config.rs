@@ -52,14 +52,19 @@ impl FrameworkConfig {
     /// 从字符串解析配置
     pub fn parse(s: &str) -> Result<Self> {
         // 尝试TOML格式
-        if let Ok(config) = toml::from_str::<Self>(s) {
-            return Ok(config);
+        match toml::from_str::<Self>(s) {
+            Ok(config) => Ok(config),
+            Err(toml_err) => {
+                // 尝试JSON格式
+                match serde_json::from_str::<Self>(s) {
+                    Ok(config) => Ok(config),
+                    Err(json_err) => Err(Error::Config(format!(
+                        "Failed to parse configuration: TOML error ({}), JSON error ({})",
+                        toml_err, json_err
+                    ))),
+                }
+            }
         }
-        // 尝试JSON格式
-        if let Ok(config) = serde_json::from_str::<Self>(s) {
-            return Ok(config);
-        }
-        Err(Error::Config("Failed to parse configuration".to_string()))
     }
 
     /// 保存配置到文件

@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    { "id": "only", "name": "Only Task" }
+  ],
+  "edges": [],
+  "expected": {
+    "node_count": 1,
+    "edge_count": 0
+  }
+}

@@ -38,15 +38,15 @@ impl TokenTracker {
                 total_completion_tokens: 0,
                 call_count: 0,
                 total_cost: 0.0,
-                input_price_per_m: 30.0,   // GPT-4 默认输入价格
-                output_price_per_m: 60.0,  // GPT-4 默认输出价格
+                input_price_per_m: 30.0,  // GPT-4 默认输入价格
+                output_price_per_m: 60.0, // GPT-4 默认输出价格
             })),
         }
     }
 
     /// 创建带自定义定价的追踪器
     pub fn with_pricing(input_price_per_m: f64, output_price_per_m: f64) -> Self {
-        let mut tracker = Self::new();
+        let tracker = Self::new();
         {
             let mut inner = tracker.inner.write();
             inner.input_price_per_m = input_price_per_m;

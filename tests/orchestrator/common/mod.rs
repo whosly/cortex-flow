@@ -3,6 +3,9 @@
 use cortex_flow::task::SimpleTask;
 use serde_json::json;
 
+#[path = "../../_common/fixture_loader.rs"]
+pub mod fixture_loader;
+
 pub fn simple_task(id: &str, name: &str) -> SimpleTask {
     SimpleTask::new(id, name, |_input, _ctx| {
         Box::pin(async move { Ok(json!({"result": "ok"})) })

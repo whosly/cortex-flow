@@ -131,6 +131,7 @@ impl CompensationChain {
     }
 
     /// 添加补偿操作
+    #[allow(clippy::should_implement_trait)]
     pub fn add<C: Compensation + 'static>(mut self, compensation: C) -> Self {
         self.compensations.push(Box::new(compensation));
         self

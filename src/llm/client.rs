@@ -21,7 +21,7 @@
 //! println!("{}", response.content);
 //! ```
 
-use super::{LLMConfig, LLMResponse, Message, TokenUsage};
+use super::{ChatRequest, LLMConfig, LLMResponse, Message, TokenTracker, TokenUsage};
 use crate::error::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -38,6 +38,37 @@ pub trait LLMClientTrait: Send + Sync {
         messages: Vec<Message>,
         config: &LLMConfig,
     ) -> Result<LLMResponse>;
+
+    /// 发送带 ChatRequest 的聊天请求
+    ///
+    /// `ChatRequest` 支持在请求级别覆盖模型名称、温度和最大 token 数等参数。
+    /// 当 `ChatRequest` 指定了 `model` 时，会基于默认配置克隆一份并替换模型，
+    /// 同时应用请求级别的 `max_tokens` 和 `temperature` 覆盖。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,ignore
+    /// use cortex_flow::llm::{ChatRequest, Message, LLMClientTrait};
+    ///
+    /// let request = ChatRequest::new(vec![Message::user("Hello!")])
+    ///     .with_model("gpt-3.5-turbo")
+    ///     .with_temperature(0.5)
+    ///     .with_max_tokens(1024);
+    ///
+    /// let response = client.chat_with_request(request).await?;
+    /// ```
+    async fn chat_with_request(&self, request: ChatRequest) -> Result<LLMResponse> {
+        // 默认实现：回退到 chat_with_config
+        let config = self.default_config();
+        let override_config = build_override_config(&config, &request);
+        self.chat_with_config(request.messages, &override_config)
+            .await
+    }
+
+    /// 获取默认配置（用于 ChatRequest 覆盖基础）
+    fn default_config(&self) -> LLMConfig {
+        LLMConfig::default()
+    }
 
     /// 流式聊天请求
     ///
@@ -59,19 +90,36 @@ pub trait LLMClientTrait: Send + Sync {
             .await;
         Ok(rx)
     }
+}
 
-    /// 结构化输出聊天请求
-    ///
-    /// 调用 LLM 并将响应解析为指定类型。
-    /// 默认实现通过 JSON 反序列化完成。
-    async fn chat_structured<T: serde::de::DeserializeOwned>(
-        &self,
-        messages: Vec<Message>,
-    ) -> Result<T> {
-        let response = self.chat(messages).await?;
-        serde_json::from_str::<T>(&response.content)
-            .map_err(|e| Error::Serialization(format!("Failed to parse structured output: {}", e)))
+/// 结构化输出工具函数
+///
+/// 调用 LLM 并将响应解析为指定类型。
+pub async fn chat_structured<T: serde::de::DeserializeOwned>(
+    client: &dyn LLMClientTrait,
+    messages: Vec<Message>,
+) -> Result<T> {
+    let response = client.chat(messages).await?;
+    serde_json::from_str::<T>(&response.content)
+        .map_err(|e| Error::Serialization(format!("Failed to parse structured output: {}", e)))
+}
+
+/// 根据 ChatRequest 构建覆盖后的配置
+///
+/// 将 ChatRequest 中的可选字段（model、max_tokens、temperature）
+/// 覆盖到基础配置上。
+pub fn build_override_config(base: &LLMConfig, request: &ChatRequest) -> LLMConfig {
+    let mut config = base.clone();
+    if let Some(ref model) = request.model {
+        config.model = model.clone();
     }
+    if let Some(max_tokens) = request.max_tokens {
+        config.max_tokens = Some(max_tokens);
+    }
+    if let Some(temperature) = request.temperature {
+        config.temperature = Some(temperature);
+    }
+    config
 }
 
 /// 流式响应块
@@ -89,26 +137,46 @@ pub struct StreamChunk {
 ///
 /// 当启用 `llm` feature 时使用 `async-openai` 库进行真实调用，
 /// 否则回退到 Mock 实现。
+///
+/// 支持可选的 `TokenTracker` 自动记录 Token 使用量。
 #[derive(Clone)]
 pub struct LLMClient {
     config: LLMConfig,
+    token_tracker: Option<TokenTracker>,
 }
 
 impl LLMClient {
     /// 创建新的 LLM 客户端
     pub fn new(config: LLMConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            token_tracker: None,
+        }
+    }
+
+    /// 创建带 Token 追踪的 LLM 客户端
+    ///
+    /// 每次成功调用 LLM 后，自动记录 Token 使用量。
+    pub fn with_token_tracker(config: LLMConfig, tracker: TokenTracker) -> Self {
+        Self {
+            config,
+            token_tracker: Some(tracker),
+        }
     }
 
     /// 从配置创建 trait 对象
     pub fn from_config(config: LLMConfig) -> Arc<dyn LLMClientTrait> {
-        Arc::new(Self { config })
+        Arc::new(Self {
+            config,
+            token_tracker: None,
+        })
     }
 
     /// 创建默认客户端
     pub fn default_client() -> Self {
         Self {
             config: LLMConfig::default(),
+            token_tracker: None,
         }
     }
 
@@ -140,7 +208,13 @@ impl LLMClient {
             .await;
 
             match result {
-                Ok(Ok(response)) => return Ok(response),
+                Ok(Ok(response)) => {
+                    // 自动记录 Token 使用量
+                    if let Some(ref tracker) = self.token_tracker {
+                        tracker.record(&response.usage);
+                    }
+                    return Ok(response);
+                }
                 Ok(Err(e)) => {
                     if e.is_recoverable() && attempt < max_retries {
                         last_error = Some(e);
@@ -268,6 +342,16 @@ impl LLMClient {
     pub fn config(&self) -> &LLMConfig {
         &self.config
     }
+
+    /// 获取 Token 追踪器（如果有）
+    pub fn token_tracker(&self) -> Option<&TokenTracker> {
+        self.token_tracker.as_ref()
+    }
+
+    /// 设置 Token 追踪器
+    pub fn set_token_tracker(&mut self, tracker: TokenTracker) {
+        self.token_tracker = Some(tracker);
+    }
 }
 
 #[async_trait]
@@ -283,6 +367,19 @@ impl LLMClientTrait for LLMClient {
         config: &LLMConfig,
     ) -> Result<LLMResponse> {
         self.chat_with_config(messages, config).await
+    }
+
+    async fn chat_with_request(&self, request: ChatRequest) -> Result<LLMResponse> {
+        let override_config = build_override_config(&self.config, &request);
+        let response = self
+            .chat_with_config(request.messages, &override_config)
+            .await?;
+        // chat_with_config 已经自动记录了 token，无需重复
+        Ok(response)
+    }
+
+    fn default_config(&self) -> LLMConfig {
+        self.config.clone()
     }
 }
 
@@ -334,10 +431,33 @@ impl LLMClientTrait for MockLLMClient {
 
     async fn chat_with_config(
         &self,
-        messages: Vec<Message>,
-        _config: &LLMConfig,
+        _messages: Vec<Message>,
+        config: &LLMConfig,
     ) -> Result<LLMResponse> {
-        self.chat(messages).await
+        if self.should_fail {
+            return Err(Error::LLMCall("Mock LLM client error".to_string()));
+        }
+        Ok(LLMResponse {
+            content: self.response_content.clone(),
+            model: config.model.clone(),
+            finish_reason: Some("stop".to_string()),
+            usage: TokenUsage::new(10, 5),
+            metadata: None,
+        })
+    }
+
+    async fn chat_with_request(&self, request: ChatRequest) -> Result<LLMResponse> {
+        if self.should_fail {
+            return Err(Error::LLMCall("Mock LLM client error".to_string()));
+        }
+        let model = request.model.unwrap_or_else(|| "mock-model".to_string());
+        Ok(LLMResponse {
+            content: self.response_content.clone(),
+            model,
+            finish_reason: Some("stop".to_string()),
+            usage: TokenUsage::new(10, 5),
+            metadata: None,
+        })
     }
 }
 

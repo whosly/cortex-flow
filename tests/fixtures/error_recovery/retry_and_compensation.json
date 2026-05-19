@@ -1,0 +1,25 @@
+{
+  "policies": [
+    {
+      "name": "fixed_3_retries",
+      "max_retries": 3,
+      "interval_ms": 10,
+      "type": "fixed"
+    },
+    {
+      "name": "fixed_2_retries",
+      "max_retries": 2,
+      "interval_ms": 10,
+      "type": "fixed"
+    }
+  ],
+  "compensation_chains": [
+    {
+      "name": "basic_chain",
+      "steps": [
+        { "name": "step1", "expected_result": "Success" },
+        { "name": "step2", "expected_result": "Skipped" }
+      ]
+    }
+  ]
+}

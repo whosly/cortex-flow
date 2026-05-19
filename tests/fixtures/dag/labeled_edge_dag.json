@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    { "id": "a", "name": "Task A" },
+    { "id": "b", "name": "Task B" }
+  ],
+  "edges": [
+    { "from": "a", "to": "b", "label": "condition_x" }
+  ],
+  "expected": {
+    "node_count": 2,
+    "edge_count": 1
+  }
+}

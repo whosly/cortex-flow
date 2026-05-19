@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    { "id": "step1", "name": "Step 1" },
+    { "id": "step2", "name": "Step 2" }
+  ],
+  "edges": [
+    { "from": "step1", "to": "step2" }
+  ],
+  "expected": {
+    "node_count": 2,
+    "edge_count": 1
+  }
+}

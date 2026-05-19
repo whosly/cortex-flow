@@ -1,0 +1,31 @@
+{
+  "scopes": [
+    {
+      "name": "parent_child_isolation",
+      "parent": {
+        "name": "parent",
+        "data": {
+          "shared": "from_parent",
+          "parent_only": "only_in_parent"
+        }
+      },
+      "child": {
+        "name": "child",
+        "data": {
+          "shared": "from_child",
+          "child_only": "only_in_child"
+        }
+      },
+      "expected": {
+        "child_sees_own_override": { "key": "shared", "value": "from_child" },
+        "child_sees_parent_data": { "key": "parent_only", "value": "only_in_parent" },
+        "parent_unaffected": { "key": "shared", "value": "from_parent" },
+        "parent_cannot_see_child": { "key": "child_only", "exists": false }
+      }
+    },
+    {
+      "name": "root_scope_level",
+      "scope": { "name": "root", "expected_level": 0, "is_root": true }
+    }
+  ]
+}

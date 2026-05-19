@@ -1,0 +1,22 @@
+{
+  "definitions": [
+    {
+      "id": "fetch_data",
+      "name": "Fetch Data",
+      "description": "Fetches data from external API",
+      "tags": ["fetch", "io"]
+    },
+    {
+      "id": "process_data",
+      "name": "Process Data",
+      "description": "Transforms and processes raw data",
+      "tags": ["process", "transform"]
+    },
+    {
+      "id": "write_output",
+      "name": "Write Output",
+      "description": "Writes processed results to storage",
+      "tags": ["write", "io"]
+    }
+  ]
+}

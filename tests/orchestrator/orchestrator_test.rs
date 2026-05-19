@@ -3,12 +3,14 @@
 use crate::common;
 use cortex_flow::Orchestrator;
 
+/// 编排器构建，验证默认配置可成功创建
 #[tokio::test]
 async fn test_orchestrator_build() {
     let orchestrator = Orchestrator::builder().build().await;
     assert!(orchestrator.is_ok());
 }
 
+/// 编排器执行线性 DAG，验证成功及任务总数
 #[tokio::test]
 async fn test_orchestrator_execute_dag() {
     let orchestrator = Orchestrator::builder()
@@ -31,6 +33,7 @@ async fn test_orchestrator_execute_dag() {
     assert_eq!(exec_result.total_count(), 2);
 }
 
+/// 编排器执行并行 DAG（一个根→两个子节点），验证成功及总数
 #[tokio::test]
 async fn test_orchestrator_execute_parallel_dag() {
     let orchestrator = Orchestrator::builder()
@@ -55,6 +58,7 @@ async fn test_orchestrator_execute_parallel_dag() {
     assert_eq!(exec_result.total_count(), 3);
 }
 
+/// 编排器带进度回调执行 DAG，验证回调被调用
 #[tokio::test]
 async fn test_orchestrator_execute_with_progress() {
     let orchestrator = Orchestrator::builder().build().await.unwrap();
@@ -79,6 +83,7 @@ async fn test_orchestrator_execute_with_progress() {
     assert!(progress_calls.load(std::sync::atomic::Ordering::SeqCst) > 0);
 }
 
+/// 编排器内置策略注册表，验证 Dag/Sequential 策略已注册
 #[tokio::test]
 async fn test_orchestrator_strategy_registry() {
     let orchestrator = Orchestrator::builder().build().await.unwrap();
@@ -89,6 +94,7 @@ async fn test_orchestrator_strategy_registry() {
     assert!(registry.is_registered(&cortex_flow::strategy::StrategyType::Sequential));
 }
 
+/// 编排器配置传递，验证 with_max_parallelism 设置生效
 #[tokio::test]
 async fn test_orchestrator_config() {
     let orchestrator = Orchestrator::builder()
@@ -101,6 +107,7 @@ async fn test_orchestrator_config() {
     assert_eq!(config.execution.max_workers, 8);
 }
 
+/// 编排器执行单个任务（非 DAG），验证直接任务执行
 #[tokio::test]
 async fn test_orchestrator_single_task() {
     let orchestrator = Orchestrator::builder().build().await.unwrap();

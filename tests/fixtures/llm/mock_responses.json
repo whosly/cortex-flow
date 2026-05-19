@@ -1,0 +1,22 @@
+{
+  "responses": [
+    {
+      "name": "simple_greeting",
+      "content": "Hello from mock",
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+    },
+    {
+      "name": "json_output",
+      "content": "{\"status\": \"success\", \"data\": [1, 2, 3]}",
+      "prompt_tokens": 20,
+      "completion_tokens": 15
+    },
+    {
+      "name": "structured_analysis",
+      "content": "{\"sentiment\": \"positive\", \"confidence\": 0.95, \"keywords\": [\"great\", \"excellent\"]}",
+      "prompt_tokens": 50,
+      "completion_tokens": 30
+    }
+  ]
+}

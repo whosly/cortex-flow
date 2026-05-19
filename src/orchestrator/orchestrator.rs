@@ -32,7 +32,7 @@ use crate::config::{ConfigManager, FrameworkConfig};
 use crate::context::ExecutionContext;
 use crate::dag::{DAGBuilder, ExecutionProgress, DAG};
 use crate::error::Result;
-use crate::llm::LLMClientTrait;
+use crate::llm::{LLMClientRegistry, LLMClientTrait};
 use crate::observability::{MetricsCollector, TracerImpl};
 use crate::strategy::ExecutionResult;
 use crate::strategy::StrategyRegistry;
@@ -64,8 +64,10 @@ pub struct Orchestrator {
     pub(crate) tracer: TracerImpl,
     /// 指标收集器
     pub(crate) metrics: MetricsCollector,
-    /// LLM客户端（可选）
+    /// LLM客户端（可选，向后兼容）
     pub(crate) llm_client: Option<Arc<dyn LLMClientTrait>>,
+    /// LLM 客户端注册表（多模型管理）
+    pub(crate) llm_registry: LLMClientRegistry,
     /// 策略注册表
     pub(crate) strategy_registry: StrategyRegistry,
     /// 最大并发数
@@ -125,7 +127,7 @@ impl Orchestrator {
         P: Fn(ExecutionProgress) + Send + Sync + 'static,
     {
         dag.validate()?;
-        let mut ctx = ExecutionContext::new();
+        let mut ctx = self.create_context_with_llm();
         ctx.set("__dag__", &dag).ok();
 
         let mut executor = dag.executor().with_progress_callback(progress_callback);
@@ -152,7 +154,7 @@ impl Orchestrator {
     /// 执行已构建的 DAG 实例
     pub async fn execute_dag_instance(&self, dag: DAG) -> Result<ExecutionResult> {
         dag.validate()?;
-        let mut ctx = ExecutionContext::new();
+        let mut ctx = self.create_context_with_llm();
         ctx.set("__dag__", &dag).ok();
 
         let mut executor = dag.executor();
@@ -193,6 +195,18 @@ impl Orchestrator {
         ExecutionContext::new()
     }
 
+    /// 创建带 LLM 注册表的执行上下文
+    ///
+    /// 内部方法：在 DAG 执行前调用，将 LLM 注册表注入到上下文中，
+    /// 使得任务闭包中可以通过 `ctx.get_llm()` 获取 LLM 客户端。
+    fn create_context_with_llm(&self) -> ExecutionContext {
+        let mut ctx = ExecutionContext::new();
+        if !self.llm_registry.is_empty() {
+            ctx.attach_llm_registry(Arc::new(self.llm_registry.clone()));
+        }
+        ctx
+    }
+
     /// 获取框架配置
     pub fn config(&self) -> &FrameworkConfig {
         self.config.framework()
@@ -211,6 +225,37 @@ impl Orchestrator {
     /// 获取 LLM 客户端（如果配置了）
     pub fn llm_client(&self) -> Option<&Arc<dyn LLMClientTrait>> {
         self.llm_client.as_ref()
+    }
+
+    /// 获取 LLM 客户端注册表
+    pub fn llm_registry(&self) -> &LLMClientRegistry {
+        &self.llm_registry
+    }
+
+    /// 通过名称获取 LLM 客户端
+    pub fn get_llm(&self, name: &str) -> Option<Arc<dyn LLMClientTrait>> {
+        self.llm_registry.get(name)
+    }
+
+    /// 获取默认 LLM 客户端（优先从注册表获取，否则回退到单客户端）
+    pub fn default_llm(&self) -> Option<Arc<dyn LLMClientTrait>> {
+        self.llm_registry
+            .default_client()
+            .or_else(|| self.llm_client.clone())
+    }
+
+    /// 注册 LLM 客户端
+    pub fn register_llm(
+        &self,
+        name: impl Into<String>,
+        client: impl Into<Arc<dyn LLMClientTrait>>,
+    ) {
+        self.llm_registry.register(name, client);
+    }
+
+    /// 获取 Token 使用快照
+    pub fn token_snapshot(&self) -> crate::llm::token_tracker::TokenTrackerSnapshot {
+        self.llm_registry.token_snapshot()
     }
 
     /// 获取策略注册表

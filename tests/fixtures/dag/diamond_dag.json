@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    { "id": "root", "name": "Root Task" },
+    { "id": "left", "name": "Left Branch" },
+    { "id": "right", "name": "Right Branch" },
+    { "id": "sink", "name": "Sink Task" }
+  ],
+  "edges": [
+    { "from": "root", "to": "left" },
+    { "from": "root", "to": "right" },
+    { "from": "left", "to": "sink" },
+    { "from": "right", "to": "sink" }
+  ],
+  "expected": {
+    "node_count": 4,
+    "edge_count": 4
+  }
+}

@@ -20,9 +20,10 @@ pub use dag::{DAGBuilder, DAGEdge, DAGNode, ExecutionProgress, ProgressCallback}
 pub use error::{Error, Result};
 pub use error_recovery::{ErrorHandler, ErrorRecovery, RetryPolicy};
 pub use execution::ExecutionEngine;
+pub use llm::LLMClientRegistry;
 pub use orchestrator::Orchestrator;
 pub use strategy::{
     ExecutionResult, OrchestrationStrategy, StrategyFactory, StrategyRegistry, StrategyType,
     TaskExecutionResult,
 };
-pub use task::{Task, TaskExecutor, TaskInput, TaskOutput, TaskResult};
+pub use task::{Task, TaskExecutor, TaskInput, TaskOutput, TaskRegistry, TaskResult};

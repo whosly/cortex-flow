@@ -1,5 +1,6 @@
 //! # 执行上下文
 
+use crate::llm::{LLMClientRegistry, LLMClientTrait, TokenTrackerSnapshot};
 use chrono::Utc;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -15,6 +16,8 @@ struct ExecutionContextInner {
     session_id: String,
     data: HashMap<String, serde_json::Value>,
     logs: Vec<ContextLog>,
+    /// LLM 客户端注册表引用（可选）
+    llm_registry: Option<Arc<LLMClientRegistry>>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +35,7 @@ impl ExecutionContext {
                 session_id: Uuid::new_v4().to_string(),
                 data: HashMap::new(),
                 logs: Vec::new(),
+                llm_registry: None,
             })),
         }
     }
@@ -140,6 +144,69 @@ impl ExecutionContext {
         let mut inner = self.inner.write();
         inner.data.clear();
         inner.logs.clear();
+    }
+
+    // ========================================================================
+    // LLM 客户端访问
+    // ========================================================================
+
+    /// 关联 LLM 客户端注册表
+    ///
+    /// 通常由 Orchestrator 在 DAG 执行前自动调用。
+    /// 关联后，DAG 任务闭包中可通过 `ctx.get_llm()` 获取 LLM 客户端。
+    pub fn attach_llm_registry(&mut self, registry: Arc<LLMClientRegistry>) {
+        let mut inner = self.inner.write();
+        inner.llm_registry = Some(registry);
+    }
+
+    /// 通过名称获取 LLM 客户端
+    ///
+    /// 需要先通过 `attach_llm_registry` 关联注册表。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,ignore
+    /// // 在 DAG 任务闭包中：
+    /// if let Some(client) = ctx.get_llm("gpt4") {
+    ///     let response = client.chat(messages).await?;
+    /// }
+    /// ```
+    pub fn get_llm(&self, name: &str) -> Option<Arc<dyn LLMClientTrait>> {
+        self.inner
+            .read()
+            .llm_registry
+            .as_ref()
+            .and_then(|r| r.get(name))
+    }
+
+    /// 获取默认 LLM 客户端
+    ///
+    /// 返回注册表中标记为默认的客户端，或第一个注册的客户端。
+    pub fn default_llm(&self) -> Option<Arc<dyn LLMClientTrait>> {
+        self.inner
+            .read()
+            .llm_registry
+            .as_ref()
+            .and_then(|r| r.default_client())
+    }
+
+    /// 获取所有已注册的 LLM 客户端名称
+    pub fn llm_names(&self) -> Vec<String> {
+        self.inner
+            .read()
+            .llm_registry
+            .as_ref()
+            .map(|r| r.names())
+            .unwrap_or_default()
+    }
+
+    /// 获取 Token 使用快照
+    pub fn token_snapshot(&self) -> Option<TokenTrackerSnapshot> {
+        self.inner
+            .read()
+            .llm_registry
+            .as_ref()
+            .map(|r| r.token_snapshot())
     }
 }
 

@@ -23,8 +23,8 @@
 //! }).await;
 //! ```
 
-pub use compensation::{Compensation, CompensationResult};
-pub use handler::{ErrorAction, ErrorHandler};
+pub use compensation::{Compensation, CompensationChain, CompensationResult, FnCompensation};
+pub use handler::{ErrorAction, ErrorCategory, ErrorHandler};
 pub use recovery::ErrorRecovery;
 pub use retry::RetryPolicy;
 

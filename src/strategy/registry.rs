@@ -125,6 +125,52 @@ impl StrategyRegistry {
     pub fn is_empty(&self) -> bool {
         self.factories.is_empty()
     }
+
+    /// 按名称创建策略
+    ///
+    /// 支持的名称：`"dag"`, `"sequential"`（不区分大小写）
+    pub fn create_by_name(&self, name: &str) -> Result<Box<dyn OrchestrationStrategy>> {
+        let strategy_type = Self::parse_type_name(name)?;
+        self.create(&strategy_type)
+    }
+
+    /// 按名称创建策略（带配置）
+    pub fn create_by_name_with_config(
+        &self,
+        name: &str,
+        config: StrategyConfig,
+    ) -> Result<Box<dyn OrchestrationStrategy>> {
+        let strategy_type = Self::parse_type_name(name)?;
+        self.create_with_config(&strategy_type, config)
+    }
+
+    /// 验证注册的策略完整性
+    ///
+    /// 检查每个已注册的策略工厂是否能正常创建实例。
+    /// 返回验证失败的策略类型列表。
+    pub fn validate_registered(&self) -> Vec<(StrategyType, String)> {
+        let mut errors = Vec::new();
+        for strategy_type in self.factories.keys() {
+            if let Err(e) = self.create(strategy_type) {
+                errors.push((*strategy_type, e.to_string()));
+            }
+        }
+        errors
+    }
+
+    /// 解析策略类型名称
+    fn parse_type_name(name: &str) -> Result<StrategyType> {
+        match name.to_lowercase().as_str() {
+            "dag" => Ok(StrategyType::Dag),
+            "sequential" | "seq" => Ok(StrategyType::Sequential),
+            "consensus" => Ok(StrategyType::Consensus),
+            "mapreduce" | "map_reduce" => Ok(StrategyType::MapReduce),
+            _ => Err(Error::Strategy(format!(
+                "Unknown strategy name: '{}'. Available: dag, sequential",
+                name
+            ))),
+        }
+    }
 }
 
 impl Default for StrategyRegistry {

@@ -6,6 +6,7 @@ use cortex_flow::execution::ExecutionEngine;
 use cortex_flow::strategy::DAGStrategy;
 use std::sync::Arc;
 
+/// 执行引擎执行线性 DAG，验证成功
 #[tokio::test]
 async fn test_engine_execute_dag() {
     let strategy = Arc::new(DAGStrategy::default());
@@ -17,6 +18,7 @@ async fn test_engine_execute_dag() {
     assert!(result.is_success());
 }
 
+/// 执行引擎状态追踪，验证执行前后 is_completed 状态变化
 #[tokio::test]
 async fn test_engine_state_tracking() {
     let strategy = Arc::new(DAGStrategy::default());
@@ -31,6 +33,7 @@ async fn test_engine_state_tracking() {
     assert!(engine.is_completed());
 }
 
+/// 执行引擎 with_dag 构造，验证未启动时 total_count 为 0
 #[tokio::test]
 async fn test_engine_with_dag() {
     let strategy = Arc::new(DAGStrategy::default());

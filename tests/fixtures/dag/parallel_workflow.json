@@ -1,0 +1,15 @@
+{
+  "nodes": [
+    { "id": "a", "name": "Task A" },
+    { "id": "b", "name": "Task B" },
+    { "id": "c", "name": "Task C" }
+  ],
+  "edges": [
+    { "from": "a", "to": "b" },
+    { "from": "a", "to": "c" }
+  ],
+  "expected": {
+    "node_count": 3,
+    "edge_count": 2
+  }
+}

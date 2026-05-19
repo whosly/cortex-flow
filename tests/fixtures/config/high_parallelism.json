@@ -1,0 +1,21 @@
+{
+  "execution": {
+    "max_workers": 16,
+    "default_timeout": 60000,
+    "max_retries": 5,
+    "retry_interval_ms": 2000
+  },
+  "logging": {
+    "level": "debug",
+    "format": "text",
+    "target": "stdout"
+  },
+  "strategy": {
+    "default_type": "Sequential"
+  },
+  "observability": {
+    "tracing": false,
+    "metrics": true,
+    "tracing_sample_rate": 0.1
+  }
+}

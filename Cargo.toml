@@ -49,12 +49,28 @@ tempfile = "3.8"
 anyhow = "1.0"
 
 [[test]]
+name = "config"
+path = "tests/config/mod.rs"
+
+[[test]]
+name = "context"
+path = "tests/context/mod.rs"
+
+[[test]]
 name = "dag"
 path = "tests/dag/mod.rs"
 
 [[test]]
+name = "error_recovery"
+path = "tests/error_recovery/mod.rs"
+
+[[test]]
 name = "execution"
 path = "tests/execution/mod.rs"
+
+[[test]]
+name = "llm"
+path = "tests/llm/mod.rs"
 
 [[test]]
 name = "orchestrator"
@@ -63,6 +79,10 @@ path = "tests/orchestrator/mod.rs"
 [[test]]
 name = "strategy"
 path = "tests/strategy/mod.rs"
+
+[[test]]
+name = "task"
+path = "tests/task/mod.rs"
 
 [features]
 default = []

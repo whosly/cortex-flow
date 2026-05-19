@@ -1,0 +1,41 @@
+{
+  "scenarios": [
+    {
+      "name": "single_call",
+      "records": [
+        { "prompt_tokens": 1000, "completion_tokens": 500 }
+      ],
+      "expected": {
+        "total_prompt_tokens": 1000,
+        "total_completion_tokens": 500,
+        "total_tokens": 1500,
+        "call_count": 1
+      }
+    },
+    {
+      "name": "multiple_calls",
+      "records": [
+        { "prompt_tokens": 1000, "completion_tokens": 500 },
+        { "prompt_tokens": 2000, "completion_tokens": 1000 }
+      ],
+      "expected": {
+        "total_prompt_tokens": 3000,
+        "total_completion_tokens": 1500,
+        "total_tokens": 4500,
+        "call_count": 2
+      }
+    },
+    {
+      "name": "accumulated_cost",
+      "input_price_per_m": 30.0,
+      "output_price_per_m": 60.0,
+      "records": [
+        { "prompt_tokens": 1000000, "completion_tokens": 500000 }
+      ],
+      "expected": {
+        "total_cost": 60.0,
+        "call_count": 1
+      }
+    }
+  ]
+}

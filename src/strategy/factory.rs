@@ -37,6 +37,35 @@ impl StrategyFactory {
         }
     }
 
+    /// 按名称创建策略
+    ///
+    /// 支持的名称：`"dag"`, `"sequential"`（不区分大小写）
+    pub fn create_by_name(name: &str) -> Result<Box<dyn OrchestrationStrategy>> {
+        let strategy_type = Self::parse_type_name(name)?;
+        Self::create(strategy_type)
+    }
+
+    /// 按名称创建策略（带配置）
+    pub fn create_by_name_with_config(
+        name: &str,
+        config: StrategyConfig,
+    ) -> Result<Box<dyn OrchestrationStrategy>> {
+        let strategy_type = Self::parse_type_name(name)?;
+        Self::create_with_config(strategy_type, config)
+    }
+
+    /// 解析策略类型名称
+    fn parse_type_name(name: &str) -> Result<StrategyType> {
+        match name.to_lowercase().as_str() {
+            "dag" => Ok(StrategyType::Dag),
+            "sequential" | "seq" => Ok(StrategyType::Sequential),
+            _ => Err(Error::Strategy(format!(
+                "Unknown strategy name: '{}'. Available: dag, sequential",
+                name
+            ))),
+        }
+    }
+
     /// 创建默认DAG策略
     pub fn dag_strategy() -> Box<dyn OrchestrationStrategy> {
         Box::new(DAGStrategy::default())

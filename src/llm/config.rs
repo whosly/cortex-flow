@@ -96,12 +96,67 @@ impl LLMConfig {
     }
 
     /// 创建Azure OpenAI配置
-    pub fn azure(api_key: impl Into<String>, endpoint: impl Into<String>) -> Self {
+    pub fn azure(
+        api_key: impl Into<String>,
+        endpoint: impl Into<String>,
+        deployment: impl Into<String>,
+    ) -> Self {
         Self {
             provider: LLMProvider::Azure,
             api_key: api_key.into(),
-            model: endpoint.into(),
-            base_url: None,
+            model: deployment.into(),
+            base_url: Some(endpoint.into()),
+            max_tokens: None,
+            temperature: None,
+            timeout_secs: Some(60),
+            max_retries: Some(3),
+        }
+    }
+
+    /// 创建自定义 OpenAI 兼容 API 配置
+    ///
+    /// 适用于任何兼容 OpenAI Chat Completions API 的服务，例如：
+    /// - 火山引擎豆包 (Doubao)
+    /// - DeepSeek
+    /// - Moonshot (Kimi)
+    /// - 智谱 AI (GLM)
+    /// - 其他 OpenAI 兼容的推理服务
+    ///
+    /// # 参数
+    ///
+    /// - `api_key`: API 密钥
+    /// - `model`: 模型名称（如 "doubao-pro-32k"、"deepseek-chat"）
+    /// - `base_url`: API 基础地址（如 "https://ark.cn-beijing.volces.com/api/v3"）
+    ///
+    /// # 示例
+    ///
+    /// ```rust
+    /// use cortex_flow::llm::LLMConfig;
+    ///
+    /// // 火山引擎豆包
+    /// let config = LLMConfig::custom(
+    ///     "your-api-key",
+    ///     "doubao-pro-32k",
+    ///     "https://ark.cn-beijing.volces.com/api/v3",
+    /// );
+    ///
+    /// // DeepSeek
+    /// let config = LLMConfig::custom(
+    ///     "your-api-key",
+    ///     "deepseek-chat",
+    ///     "https://api.deepseek.com/v1",
+    /// );
+    /// ```
+    pub fn custom(
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+        base_url: impl Into<String>,
+    ) -> Self {
+        Self {
+            provider: LLMProvider::Custom,
+            api_key: api_key.into(),
+            model: model.into(),
+            base_url: Some(base_url.into()),
             max_tokens: None,
             temperature: None,
             timeout_secs: Some(60),
