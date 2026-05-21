@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CortexFlow Editor</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        /* ============================================
+           CSS Variables & Theme
+        ============================================ */
+        :root {
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --radius: 6px;
+            --transition: 0.2s ease;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #1c2128;
+            --bg-hover: #1f2937;
+            --bg-active: #263044;
+            --bg-overlay: rgba(0,0,0,0.6);
+            --border: #30363d;
+            --border-light: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-tertiary: #6e7681;
+            --text-inverse: #0d1117;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --accent-dim: rgba(88,166,255,0.15);
+            --success: #3fb950;
+            --success-dim: rgba(63,185,80,0.15);
+            --warning: #d29922;
+            --warning-dim: rgba(210,153,34,0.15);
+            --danger: #f85149;
+            --danger-dim: rgba(248,81,73,0.15);
+            --info: #58a6ff;
+            --info-dim: rgba(88,166,255,0.15);
+            --scrollbar: #484f58;
+            --scrollbar-hover: #6e7681;
+            --code-bg: #0d1117;
+            --shadow: 0 1px 3px rgba(0,0,0,0.4);
+            --mermaid-bg: transparent;
+            --node-data: #58a6ff;
+            --node-llm: #d29922;
+            --node-transform: #3fb950;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --bg-hover: #eaeef2;
+            --bg-active: #d0d7de;
+            --bg-overlay: rgba(0,0,0,0.3);
+            --border: #d0d7de;
+            --border-light: #e8ecf0;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+            --text-tertiary: #8c959f;
+            --text-inverse: #ffffff;
+            --accent: #0969da;
+            --accent-hover: #0550ae;
+            --accent-dim: rgba(9,105,218,0.1);
+            --success: #1a7f37;
+            --success-dim: rgba(26,127,55,0.1);
+            --warning: #9a6700;
+            --warning-dim: rgba(154,103,0,0.1);
+            --danger: #cf222e;
+            --danger-dim: rgba(207,34,46,0.1);
+            --info: #0969da;
+            --info-dim: rgba(9,105,218,0.1);
+            --scrollbar: #c1c8cd;
+            --scrollbar-hover: #a0a8ae;
+            --code-bg: #f6f8fa;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --mermaid-bg: #ffffff;
+            --node-data: #0969da;
+            --node-llm: #9a6700;
+            --node-transform: #1a7f37;
+        }
+
+        /* ============================================
+           Reset & Base
+        ============================================ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+        /* ============================================
+           Layout
+        ============================================ */
+        .app-layout {
+            display: grid;
+            grid-template-rows: 40px 1fr 24px;
+            grid-template-columns: 240px 1fr;
+            grid-template-areas:
+                "header header"
+                "sidebar main"
+                "footer footer";
+            height: 100vh;
+        }
+
+        /* Header */
+        .app-header {
+            grid-area: header;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 12px;
+            -webkit-app-region: drag;
+            z-index: 100;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--text-primary);
+            user-select: none;
+        }
+
+        .header-logo .logo-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, var(--accent), #a371f7);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: white;
+        }
+
+        .header-tabs {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            height: 100%;
+            margin-left: 16px;
+            -webkit-app-region: no-drag;
+        }
+
+        .header-tab {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 14px;
+            height: 100%;
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all var(--transition);
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .header-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .header-tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent);
+        }
+
+        .header-tab .tab-icon { font-size: 13px; }
+
+        .header-actions {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            -webkit-app-region: no-drag;
+        }
+
+        .header-btn {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition);
+            border: none;
+            background: none;
+            font-size: 14px;
+        }
+
+        .header-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Sidebar */
+        .app-sidebar {
+            grid-area: sidebar;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 12px 14px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 6px 12px;
+        }
+
+        .pipeline-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all var(--transition);
+            margin-bottom: 2px;
+            border: 1px solid transparent;
+        }
+
+        .pipeline-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .pipeline-item.active {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+        }
+
+        .pipeline-item .pipe-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .pipeline-item .pipe-icon.data { background: var(--info-dim); color: var(--info); }
+        .pipeline-item .pipe-icon.llm { background: var(--warning-dim); color: var(--warning); }
+        .pipeline-item .pipe-icon.transform { background: var(--success-dim); color: var(--success); }
+        .pipeline-item .pipe-icon.error { background: var(--danger-dim); color: var(--danger); }
+
+        .pipeline-item .pipe-info { flex: 1; min-width: 0; }
+        .pipeline-item .pipe-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pipeline-item .pipe-desc {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pipeline-item .pipe-nodes {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            background: var(--bg-tertiary);
+            padding: 1px 6px;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-section {
+            border-top: 1px solid var(--border);
+            padding: 10px 12px;
+        }
+
+        .sidebar-section .sec-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .model-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            margin: 2px;
+            font-family: var(--font-mono);
+        }
+
+        .model-chip.gpt { background: var(--info-dim); color: var(--info); }
+        .model-chip.llama { background: var(--success-dim); color: var(--success); }
+        .model-chip.doubao { background: var(--warning-dim); color: var(--warning); }
+        .model-chip .default-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Main Content */
+        .app-main {
+            grid-area: main;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-primary);
+        }
+
+        .main-content {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .page { display: none; height: 100%; }
+        .page.active { display: flex; }
+
+        /* Footer */
+        .app-footer {
+            grid-area: footer;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            gap: 16px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .footer-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .footer-item .dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+        }
+
+        .footer-item .dot.green { background: var(--success); }
+        .footer-item .dot.yellow { background: var(--warning); }
+        .footer-item .dot.red { background: var(--danger); }
+        .footer-item .dot.blue { background: var(--accent); }
+
+        /* ============================================
+           DAG Page
+        ============================================ */
+        .dag-page {
+            flex-direction: row;
+        }
+
+        .dag-canvas {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .dag-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .dag-toolbar .toolbar-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: var(--radius);
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-tertiary);
+            transition: all var(--transition);
+        }
+
+        .dag-toolbar .toolbar-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .dag-toolbar .toolbar-btn.primary {
+            background: var(--accent);
+            color: var(--text-inverse);
+            border-color: var(--accent);
+            font-weight: 500;
+        }
+
+        .dag-toolbar .toolbar-btn.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .dag-toolbar .toolbar-btn.primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .dag-toolbar .toolbar-btn.danger {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .dag-toolbar .toolbar-sep {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+
+        .dag-toolbar .toolbar-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+        }
+
+        .dag-graph-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            padding: 24px;
+            background: var(--bg-primary);
+        }
+
+        .dag-graph-area .mermaid-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 24px;
+            min-width: 300px;
+            box-shadow: var(--shadow);
+        }
+
+        /* DAG right panel */
+        .dag-panel {
+            width: 320px;
+            border-left: 1px solid var(--border);
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .node-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            transition: all var(--transition);
+            cursor: pointer;
+        }
+
+        .node-card:hover { border-color: var(--accent); }
+
+        .node-card.running {
+            border-color: var(--warning);
+            box-shadow: 0 0 0 1px var(--warning-dim);
+        }
+
+        .node-card.completed {
+            border-color: var(--success);
+            box-shadow: 0 0 0 1px var(--success-dim);
+        }
+
+        .node-card.failed {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 1px var(--danger-dim);
+        }
+
+        .node-card .nc-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .node-card .nc-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .node-card .nc-badge {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-family: var(--font-mono);
+        }
+
+        .node-card .nc-badge.data { background: var(--info-dim); color: var(--info); }
+        .node-card .nc-badge.llm { background: var(--warning-dim); color: var(--warning); }
+        .node-card .nc-badge.transform { background: var(--success-dim); color: var(--success); }
+
+        .node-card .nc-id {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-tertiary);
+        }
+
+        .node-card .nc-status {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            font-size: 11px;
+        }
+
+        .node-card .nc-status .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+        }
+
+        .node-card .nc-status .status-dot.running {
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        .node-card .nc-status .status-dot.completed { background: var(--success); }
+        .node-card .nc-status .status-dot.failed { background: var(--danger); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .node-card .nc-duration {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+
+        /* ============================================
+           Runner Page
+        ============================================ */
+        .runner-page {
+            flex-direction: column;
+        }
+
+        .runner-split {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .runner-top {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .runner-bottom {
+            height: 240px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+        }
+
+        .runner-console {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            line-height: 1.6;
+            background: var(--code-bg);
+        }
+
+        .log-line {
+            display: flex;
+            gap: 8px;
+        }
+
+        .log-line .log-time { color: var(--text-tertiary); white-space: nowrap; }
+        .log-line .log-level { white-space: nowrap; font-weight: 600; }
+        .log-line .log-level.info { color: var(--accent); }
+        .log-line .log-level.success { color: var(--success); }
+        .log-line .log-level.warn { color: var(--warning); }
+        .log-line .log-level.error { color: var(--danger); }
+        .log-line .log-msg { color: var(--text-primary); word-break: break-all; }
+
+        /* Execution nodes grid */
+        .exec-nodes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            padding: 12px 14px;
+        }
+
+        .exec-node {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px;
+            transition: all var(--transition);
+        }
+
+        .exec-node.running {
+            border-color: var(--warning);
+            animation: nodePulse 2s infinite;
+        }
+
+        .exec-node.completed { border-color: var(--success); }
+        .exec-node.failed { border-color: var(--danger); }
+
+        @keyframes nodePulse {
+            0%, 100% { box-shadow: 0 0 0 0 transparent; }
+            50% { box-shadow: 0 0 8px 0 var(--warning-dim); }
+        }
+
+        .exec-node .en-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .exec-node .en-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+            flex-shrink: 0;
+        }
+
+        .exec-node .en-dot.running { background: var(--warning); animation: pulse 1.5s infinite; }
+        .exec-node .en-dot.completed { background: var(--success); }
+        .exec-node .en-dot.failed { background: var(--danger); }
+
+        .exec-node .en-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .exec-node .en-detail {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            font-family: var(--font-mono);
+        }
+
+        /* Progress bar */
+        .runner-progress {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #a371f7);
+            border-radius: 2px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        /* ============================================
+           Code Page
+        ============================================ */
+        .code-page {
+            flex-direction: column;
+        }
+
+        .code-editor {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.6;
+            background: var(--code-bg);
+        }
+
+        .code-line {
+            display: flex;
+            padding: 0 16px 0 0;
+        }
+
+        .code-line:hover {
+            background: var(--bg-hover);
+        }
+
+        .code-line .line-num {
+            width: 48px;
+            text-align: right;
+            padding-right: 16px;
+            color: var(--text-tertiary);
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .code-line .line-content {
+            flex: 1;
+            white-space: pre;
+            overflow-x: auto;
+        }
+
+        /* JSON syntax highlighting */
+        .json-key { color: var(--accent); }
+        .json-string { color: var(--success); }
+        .json-number { color: var(--warning); }
+        .json-bool { color: #a371f7; }
+        .json-null { color: var(--text-tertiary); }
+        .json-bracket { color: var(--text-secondary); }
+
+        /* ============================================
+           Tokens Page
+        ============================================ */
+        .tokens-page {
+            flex-direction: column;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .token-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .token-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .token-card .tc-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 4px;
+        }
+
+        .token-card .tc-value {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+
+        .token-card .tc-value.blue { color: var(--accent); }
+        .token-card .tc-value.green { color: var(--success); }
+        .token-card .tc-value.amber { color: var(--warning); }
+        .token-card .tc-value.red { color: var(--danger); }
+
+        .token-bar-chart {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .bar-label {
+            width: 100px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 20px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+
+        .bar-value {
+            width: 80px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           Empty State
+        ============================================ */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-tertiary);
+            text-align: center;
+            gap: 12px;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 48px;
+            opacity: 0.3;
+        }
+
+        .empty-state .empty-text {
+            font-size: 14px;
+        }
+
+        .empty-state .empty-hint {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
+        /* ============================================
+           Toast
+        ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 50px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 14px;
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: toastIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success { border-left: 3px solid var(--success); }
+        .toast.error { border-left: 3px solid var(--danger); }
+        .toast.warning { border-left: 3px solid var(--warning); }
+        .toast.info { border-left: 3px solid var(--accent); }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* ============================================
+           Mermaid Overrides
+        ============================================ */
+        .dag-graph-area .mermaid-container svg {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* ============================================
+           Responsive
+        ============================================ */
+        @media (max-width: 900px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "header"
+                    "main"
+                    "footer";
+            }
+            .app-sidebar { display: none; }
+            .token-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="logo-icon">⚡</div>
+                <span>CortexFlow</span>
+            </div>
+            <div class="header-tabs">
+                <div class="header-tab active" data-tab="dag" onclick="switchTab('dag')">
+                    <span class="tab-icon">◈</span> DAG Visualizer
+                </div>
+                <div class="header-tab" data-tab="runner" onclick="switchTab('runner')">
+                    <span class="tab-icon">▶</span> Runner
+                </div>
+                <div class="header-tab" data-tab="code" onclick="switchTab('code')">
+                    <span class="tab-icon">{ }</span> Code
+                </div>
+                <div class="header-tab" data-tab="tokens" onclick="switchTab('tokens')">
+                    <span class="tab-icon">◉</span> Tokens
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" onclick="toggleTheme()" title="切换主题" id="theme-btn">☀</button>
+                <button class="header-btn" onclick="refreshData()" title="刷新数据">↻</button>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="app-sidebar">
+            <div class="sidebar-header">Pipelines</div>
+            <div class="sidebar-content" id="sidebar-pipelines"></div>
+            <div class="sidebar-section">
+                <div class="sec-title">LLM Models</div>
+                <div id="sidebar-models"></div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="app-main">
+            <div class="main-content">
+                <!-- DAG Page -->
+                <div id="page-dag" class="page active dag-page">
+                    <div class="dag-canvas">
+                        <div class="dag-toolbar">
+                            <select id="dag-select" class="toolbar-btn" onchange="loadDag()" style="padding:4px 8px;min-width:160px;">
+                                <option value="">Select Pipeline</option>
+                            </select>
+                            <div class="toolbar-sep"></div>
+                            <button class="toolbar-btn primary" id="run-dag-btn" onclick="runFromDag()" disabled>
+                                ▶ Run Pipeline
+                            </button>
+                            <button class="toolbar-btn" onclick="resetDagState()">
+                                ↺ Reset
+                            </button>
+                            <div style="flex:1"></div>
+                            <span class="toolbar-label" id="dag-status-label"></span>
+                        </div>
+                        <div class="dag-graph-area" id="dag-graph-area">
+                            <div class="empty-state">
+                                <div class="empty-icon">◈</div>
+                                <div class="empty-text">Select a pipeline to visualize</div>
+                                <div class="empty-hint">Choose from the sidebar or dropdown above</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dag-panel">
+                        <div class="panel-header">
+                            <span>Nodes</span>
+                            <span id="node-count" style="font-weight:400;"></span>
+                        </div>
+                        <div class="panel-body" id="dag-nodes-panel"></div>
+                    </div>
+                </div>
+
+                <!-- Runner Page -->
+                <div id="page-runner" class="page runner-page">
+                    <div class="runner-top">
+                        <div class="runner-progress">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <select id="runner-select" class="toolbar-btn" style="padding:4px 8px;min-width:160px;">
+                                        <option value="">Select Pipeline</option>
+                                    </select>
+                                    <button class="toolbar-btn primary" id="run-btn" onclick="runPipeline()" disabled>
+                                        ▶ Run
+                                    </button>
+                                    <button class="toolbar-btn danger" id="stop-btn" onclick="stopPipeline()" style="display:none;">
+                                        ■ Stop
+                                    </button>
+                                </div>
+                                <span id="runner-status" style="font-size:11px;color:var(--text-tertiary);"></span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <div class="progress-info">
+                                <span id="progress-label">Ready</span>
+                                <span id="progress-percent">0%</span>
+                            </div>
+                        </div>
+                        <div class="exec-nodes" id="exec-nodes"></div>
+                    </div>
+                    <div class="runner-bottom">
+                        <div class="panel-header">
+                            <span>Console Output</span>
+                            <button class="toolbar-btn" onclick="clearConsole()" style="padding:2px 8px;font-size:10px;">Clear</button>
+                        </div>
+                        <div class="runner-console" id="runner-console">
+                            <div class="log-line">
+                                <span class="log-time">--:--:--</span>
+                                <span class="log-level info">INFO</span>
+                                <span class="log-msg">Ready. Select a pipeline and click Run.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Page -->
+                <div id="page-code" class="page code-page">
+                    <div class="dag-toolbar">
+                        <select id="code-select" class="toolbar-btn" onchange="loadCode()" style="padding:4px 8px;min-width:160px;">
+                            <option value="">Select Pipeline</option>
+                        </select>
+                        <div class="toolbar-sep"></div>
+                        <button class="toolbar-btn" onclick="copyCode()">⎘ Copy</button>
+                        <div style="flex:1"></div>
+                        <span class="toolbar-label" id="code-label"></span>
+                    </div>
+                    <div class="code-editor" id="code-editor">
+                        <div class="empty-state">
+                            <div class="empty-icon">{ }</div>
+                            <div class="empty-text">Select a pipeline to view configuration</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tokens Page -->
+                <div id="page-tokens" class="page tokens-page">
+                    <div class="token-grid">
+                        <div class="token-card">
+                            <div class="tc-label">API Calls</div>
+                            <div class="tc-value blue" id="tk-calls">0</div>
+                        </div>
+                        <div class="token-card">
+                            <div class="tc-label">Total Tokens</div>
+                            <div class="tc-value green" id="tk-total">0</div>
+                        </div>
+                        <div class="token-card">
+                            <div class="tc-label">Prompt Tokens</div>
+                            <div class="tc-value amber" id="tk-prompt">0</div>
+                        </div>
+                        <div class="token-card">
+                            <div class="tc-label">Est. Cost</div>
+                            <div class="tc-value red" id="tk-cost">$0.0000</div>
+                        </div>
+                    </div>
+                    <div class="token-bar-chart">
+                        <div class="panel-header" style="padding:0 0 12px;border:none;">Token Breakdown</div>
+                        <div id="token-bars">
+                            <div class="bar-row">
+                                <div class="bar-label">Prompt</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--accent);"></div></div>
+                                <div class="bar-value">0</div>
+                            </div>
+                            <div class="bar-row">
+                                <div class="bar-label">Completion</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--success);"></div></div>
+                                <div class="bar-value">0</div>
+                            </div>
+                            <div class="bar-row">
+                                <div class="bar-label">API Calls</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--warning);"></div></div>
+                                <div class="bar-value">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="token-bar-chart" style="margin-top:12px;">
+                        <div class="panel-header" style="padding:0 0 12px;border:none;">About Token Tracking</div>
+                        <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;">
+                            <p>Token statistics are tracked via <code style="background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-family:var(--font-mono);font-size:11px;">TokenTracker</code>, automatically integrated on each LLM call.</p>
+                            <p>Access via <code style="background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-family:var(--font-mono);font-size:11px;">ctx.token_snapshot()</code> in DAG tasks or <code style="background:var(--bg-tertiary);padding:1px 4px;border-radius:3px;font-family:var(--font-mono);font-size:11px;">orchestrator.token_snapshot()</code> at the orchestrator level.</p>
+                            <p style="color:var(--warning);margin-top:8px;">Demo mode uses MockLLMClient — token data is simulated. Connect a real LLM API for actual tracking.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <div class="footer-item">
+                <div class="dot green"></div>
+                <span>Connected</span>
+            </div>
+            <div class="footer-item" id="footer-pipeline">
+                <div class="dot blue"></div>
+                <span>No pipeline selected</span>
+            </div>
+            <div class="footer-item" id="footer-exec">
+                <span>Idle</span>
+            </div>
+            <div style="flex:1"></div>
+            <div class="footer-item">
+                <span>CortexFlow v0.1.0 · Rust + Axum + SSE</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // ============================================================================
+        // State
+        // ============================================================================
+        let pipelines = [];
+        let models = [];
+        let currentPipeline = null;
+        let eventSource = null;
+        let isRunning = false;
+        let nodeStates = {};
+        let currentTab = 'dag';
+
+        // ============================================================================
+        // API
+        // ============================================================================
+        async function api(path) {
+            const res = await fetch(path);
+            return res.json();
+        }
+
+        // ============================================================================
+        // Theme
+        // ============================================================================
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            document.getElementById('theme-btn').textContent = next === 'dark' ? '☀' : '🌙';
+            localStorage.setItem('cortex-theme', next);
+            // Re-render mermaid if on DAG page
+            if (currentPipeline) loadDag();
+        }
+
+        function initTheme() {
+            const saved = localStorage.getItem('cortex-theme');
+            if (saved) {
+                document.documentElement.setAttribute('data-theme', saved);
+                document.getElementById('theme-btn').textContent = saved === 'dark' ? '☀' : '🌙';
+            }
+        }
+
+        // ============================================================================
+        // Tab Switching
+        // ============================================================================
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + tab).classList.add('active');
+
+            if (tab === 'tokens') loadTokenStats();
+            if (tab === 'code' && currentPipeline) loadCode();
+            if (tab === 'runner' && currentPipeline) {
+                document.getElementById('runner-select').value = currentPipeline;
+                renderExecNodes();
+            }
+        }
+
+        // ============================================================================
+        // Sidebar
+        // ============================================================================
+        function renderSidebar() {
+            const container = document.getElementById('sidebar-pipelines');
+            const iconMap = {
+                'basic': '📊', 'llm': '🤖', 'multi-model': '🧠',
+                'context': '📦', 'error-recovery': '⚠️'
+            };
+            const typeMap = {
+                'basic': 'data', 'llm': 'llm', 'multi-model': 'llm',
+                'context': 'transform', 'error-recovery': 'error'
+            };
+
+            container.innerHTML = pipelines.map(p => `
+                <div class="pipeline-item ${currentPipeline === p.id ? 'active' : ''}"
+                     onclick="selectPipeline('${p.id}')">
+                    <div class="pipe-icon ${typeMap[p.id] || 'data'}">${iconMap[p.id] || '📋'}</div>
+                    <div class="pipe-info">
+                        <div class="pipe-name">${p.name}</div>
+                        <div class="pipe-desc">${p.description}</div>
+                    </div>
+                    <div class="pipe-nodes">${p.nodes.length}</div>
+                </div>
+            `).join('');
+
+            // Models
+            const modelsContainer = document.getElementById('sidebar-models');
+            const modelTypeMap = { 'gpt4': 'gpt', 'llama3': 'llama', 'doubao': 'doubao' };
+            modelsContainer.innerHTML = models.map(m => `
+                <span class="model-chip ${modelTypeMap[m.name] || 'gpt'}">
+                    ${m.is_default ? '<span class="default-dot"></span>' : ''}
+                    ${m.model}
+                </span>
+            `).join('');
+        }
+
+        function selectPipeline(id) {
+            currentPipeline = id;
+            renderSidebar();
+            updateFooter();
+
+            // Update all selects
+            ['dag-select', 'runner-select', 'code-select'].forEach(selId => {
+                document.getElementById(selId).value = id;
+            });
+
+            // Enable run buttons
+            document.getElementById('run-dag-btn').disabled = false;
+            document.getElementById('run-btn').disabled = isRunning;
+
+            // Load based on current tab
+            if (currentTab === 'dag') loadDag();
+            if (currentTab === 'code') loadCode();
+            if (currentTab === 'runner') renderExecNodes();
+        }
+
+        // ============================================================================
+        // DAG Visualizer
+        // ============================================================================
+        async function loadDag() {
+            const id = document.getElementById('dag-select').value || currentPipeline;
+            if (!id) return;
+
+            currentPipeline = id;
+            renderSidebar();
+
+            const spec = pipelines.find(p => p.id === id);
+            if (!spec) return;
+
+            // Reset node states
+            nodeStates = {};
+            spec.nodes.forEach(n => { nodeStates[n.id] = 'pending'; });
+            renderDagNodes(spec);
+
+            // Render Mermaid diagram
+            const area = document.getElementById('dag-graph-area');
+            const graphDef = spec.dag_mermaid;
+
+            // Apply node state colors
+            let styledDef = graphDef;
+            Object.entries(nodeStates).forEach(([nodeId, state]) => {
+                if (state === 'running') {
+                    styledDef = styledDef.replace(
+                        new RegExp(`${nodeId}\\[`, 'g'),
+                        `${nodeId}:::running[`
+                    );
+                } else if (state === 'completed') {
+                    styledDef = styledDef.replace(
+                        new RegExp(`${nodeId}\\[`, 'g'),
+                        `${nodeId}:::completed[`
+                    );
+                } else if (state === 'failed') {
+                    styledDef = styledDef.replace(
+                        new RegExp(`${nodeId}\\[`, 'g'),
+                        `${nodeId}:::failed[`
+                    );
+                }
+            });
+
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const mermaidTheme = isDark ? 'dark' : 'default';
+
+            const uniqueId = 'mermaid-' + Date.now();
+            area.innerHTML = `<div class="mermaid-container"><div class="mermaid" id="${uniqueId}">
+%%{init: {'theme': '${mermaidTheme}', 'themeVariables': { 'primaryColor': '${isDark ? '#263044' : '#dbeafe'}', 'primaryTextColor': '${isDark ? '#e6edf3' : '#1f2328'}', 'primaryBorderColor': '${isDark ? '#58a6ff' : '#0969da'}', 'lineColor': '${isDark ? '#8b949e' : '#656d76'}', 'secondaryColor': '${isDark ? '#1c2128' : '#f6f8fa'}', 'tertiaryColor': '${isDark ? '#161b22' : '#f0f2f5}' }}}%%
+${styledDef}
+classDef running fill:#9a6700,stroke:#d29922,color:#fff,stroke-width:2px
+classDef completed fill:#1a7f37,stroke:#3fb950,color:#fff,stroke-width:2px
+classDef failed fill:#cf222e,stroke:#f85149,color:#fff,stroke-width:2px
+</div></div>`;
+
+            try {
+                await mermaid.run({ nodes: [document.getElementById(uniqueId)] });
+            } catch(e) {
+                console.warn('Mermaid render:', e);
+            }
+
+            document.getElementById('dag-status-label').textContent = `${spec.name} · ${spec.nodes.length} nodes`;
+        }
+
+        function renderDagNodes(spec) {
+            const panel = document.getElementById('dag-nodes-panel');
+            document.getElementById('node-count').textContent = `${spec.nodes.length} nodes`;
+
+            panel.innerHTML = spec.nodes.map(n => {
+                const state = nodeStates[n.id] || 'pending';
+                return `
+                    <div class="node-card ${state}" id="node-card-${n.id}">
+                        <div class="nc-top">
+                            <span class="nc-name">${n.name}</span>
+                            <span class="nc-badge ${n.node_type}">${n.node_type}</span>
+                        </div>
+                        <div class="nc-id">${n.id}</div>
+                        <div class="nc-status">
+                            <span class="status-dot ${state}"></span>
+                            <span style="color:var(--text-tertiary);text-transform:capitalize;">${state}</span>
+                            <span class="nc-duration" id="node-dur-${n.id}"></span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateNodeState(nodeId, state, duration) {
+            nodeStates[nodeId] = state;
+            const card = document.getElementById('node-card-' + nodeId);
+            if (card) {
+                card.className = 'node-card ' + state;
+                const dot = card.querySelector('.status-dot');
+                if (dot) dot.className = 'status-dot ' + state;
+                const statusText = card.querySelector('.nc-status span:nth-child(2)');
+                if (statusText) statusText.textContent = state;
+                const durEl = document.getElementById('node-dur-' + nodeId);
+                if (durEl && duration) durEl.textContent = duration + 'ms';
+            }
+        }
+
+        function resetDagState() {
+            if (currentPipeline) {
+                const spec = pipelines.find(p => p.id === currentPipeline);
+                if (spec) {
+                    spec.nodes.forEach(n => { nodeStates[n.id] = 'pending'; });
+                    renderDagNodes(spec);
+                    loadDag();
+                }
+            }
+            document.getElementById('dag-status-label').textContent = '';
+        }
+
+        // ============================================================================
+        // Pipeline Runner
+        // ============================================================================
+        function renderExecNodes() {
+            const id = document.getElementById('runner-select').value || currentPipeline;
+            const spec = pipelines.find(p => p.id === id);
+            if (!spec) {
+                document.getElementById('exec-nodes').innerHTML = '';
+                return;
+            }
+
+            document.getElementById('exec-nodes').innerHTML = spec.nodes.map(n => {
+                const state = nodeStates[n.id] || 'pending';
+                return `
+                    <div class="exec-node ${state}" id="exec-node-${n.id}">
+                        <div class="en-header">
+                            <span class="en-dot ${state}"></span>
+                            <span class="en-name">${n.name}</span>
+                        </div>
+                        <div class="en-detail" id="exec-detail-${n.id}">${n.id} · pending</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateExecNode(nodeId, state, detail) {
+            const el = document.getElementById('exec-node-' + nodeId);
+            if (el) {
+                el.className = 'exec-node ' + state;
+                const dot = el.querySelector('.en-dot');
+                if (dot) dot.className = 'en-dot ' + state;
+            }
+            const detailEl = document.getElementById('exec-detail-' + nodeId);
+            if (detailEl && detail) detailEl.textContent = detail;
+        }
+
+        async function runPipeline() {
+            const id = document.getElementById('runner-select').value || currentPipeline;
+            if (!id) return;
+
+            isRunning = true;
+            currentPipeline = id;
+            const spec = pipelines.find(p => p.id === id);
+            if (!spec) return;
+
+            // Reset states
+            spec.nodes.forEach(n => { nodeStates[n.id] = 'pending'; });
+            renderExecNodes();
+
+            // UI updates
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('run-btn').style.display = 'none';
+            document.getElementById('stop-btn').style.display = '';
+            document.getElementById('runner-status').textContent = 'Executing...';
+            document.getElementById('progress-fill').style.width = '0%';
+            document.getElementById('progress-percent').textContent = '0%';
+            document.getElementById('progress-label').textContent = 'Starting...';
+            document.getElementById('runner-console').innerHTML = '';
+
+            updateFooter();
+            appendLog('info', `Starting pipeline: ${spec.name}`);
+
+            // Close previous SSE
+            if (eventSource) { eventSource.close(); eventSource = null; }
+
+            // Start SSE
+            eventSource = new EventSource(`/api/pipelines/run?pipeline=${id}`);
+
+            eventSource.addEventListener('progress', (e) => {
+                const data = JSON.parse(e.data);
+                const pct = data.percent || 0;
+
+                // Update progress bar
+                document.getElementById('progress-fill').style.width = pct + '%';
+                document.getElementById('progress-percent').textContent = pct + '%';
+                document.getElementById('progress-label').textContent = data.message;
+
+                // Log
+                const level = data.status === 'failed' ? 'error' :
+                              data.status === 'done' ? 'success' :
+                              data.status === 'started' ? 'info' : 'warn';
+                appendLog(level, data.message);
+
+                // Update node states based on progress
+                if (data.node_id) {
+                    const state = data.status === 'completed' ? 'completed' :
+                                  data.status === 'failed' ? 'failed' :
+                                  data.status === 'started' ? 'running' : 'pending';
+                    updateNodeState(data.node_id, state);
+                    updateExecNode(data.node_id, state, `${data.node_id} · ${state}`);
+                }
+
+                if (data.status === 'done') {
+                    finishPipeline();
+                }
+            });
+
+            eventSource.onerror = () => {
+                finishPipeline();
+            };
+        }
+
+        function runFromDag() {
+            const id = document.getElementById('dag-select').value || currentPipeline;
+            if (!id) return;
+            currentPipeline = id;
+            switchTab('runner');
+            document.getElementById('runner-select').value = id;
+            setTimeout(() => runPipeline(), 100);
+        }
+
+        function stopPipeline() {
+            if (eventSource) { eventSource.close(); eventSource = null; }
+            finishPipeline();
+            appendLog('warn', 'Pipeline execution stopped by user');
+        }
+
+        function finishPipeline() {
+            isRunning = false;
+            if (eventSource) { eventSource.close(); eventSource = null; }
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('run-btn').style.display = '';
+            document.getElementById('stop-btn').style.display = 'none';
+            document.getElementById('runner-status').textContent = 'Completed';
+
+            // Load final result
+            loadResult();
+
+            // Refresh DAG if on that tab
+            if (currentTab === 'dag') loadDag();
+
+            // Update token stats
+            loadTokenStats();
+
+            updateFooter();
+            showToast('success', 'Pipeline execution completed');
+        }
+
+        async function loadResult() {
+            const result = await api('/api/pipelines/result');
+            if (!result) return;
+
+            // Update node states from result
+            if (result.node_results) {
+                result.node_results.forEach(n => {
+                    const state = n.success ? 'completed' : 'failed';
+                    updateNodeState(n.task_id, state, n.duration_ms);
+                    updateExecNode(n.task_id, state, `${n.task_id} · ${state} · ${n.duration_ms}ms`);
+                    if (n.error) {
+                        appendLog('error', `Node ${n.task_id} failed: ${n.error}`);
+                    }
+                });
+            }
+
+            appendLog(result.success ? 'success' : 'error',
+                `Pipeline ${result.success ? 'succeeded' : 'failed'} in ${result.total_duration_ms}ms`);
+        }
+
+        function appendLog(level, msg) {
+            const console = document.getElementById('runner-console');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const levelLabel = level === 'success' ? 'DONE' :
+                               level === 'error' ? 'ERR ' :
+                               level === 'warn' ? 'WARN' : 'INFO';
+            console.innerHTML += `<div class="log-line">
+                <span class="log-time">${time}</span>
+                <span class="log-level ${level}">${levelLabel}</span>
+                <span class="log-msg">${msg}</span>
+            </div>`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('runner-console').innerHTML = '';
+        }
+
+        // ============================================================================
+        // Code Viewer
+        // ============================================================================
+        async function loadCode() {
+            const id = document.getElementById('code-select').value || currentPipeline;
+            if (!id) return;
+
+            currentPipeline = id;
+            const spec = pipelines.find(p => p.id === id);
+            if (!spec) return;
+
+            const codeData = {
+                pipeline: {
+                    id: spec.id,
+                    name: spec.name,
+                    description: spec.description,
+                    strategy: "DAG"
+                },
+                dag: {
+                    nodes: spec.nodes.map(n => ({
+                        id: n.id,
+                        name: n.name,
+                        type: n.node_type,
+                        dependencies: spec.edges
+                            .filter(([_, to]) => to === n.id)
+                            .map(([from]) => from)
+                    })),
+                    edges: spec.edges
+                },
+                execution: {
+                    max_parallelism: 4,
+                    retry_policy: {
+                        max_retries: 3,
+                        initial_delay_ms: 100,
+                        backoff_factor: 2.0
+                    }
+                }
+            };
+
+            const jsonStr = JSON.stringify(codeData, null, 2);
+            renderCode(jsonStr);
+
+            document.getElementById('code-label').textContent = `${spec.name} · pipeline.json`;
+        }
+
+        function renderCode(jsonStr) {
+            const editor = document.getElementById('code-editor');
+            const lines = jsonStr.split('\n');
+            editor.innerHTML = lines.map((line, i) => {
+                const highlighted = highlightJSON(line);
+                return `<div class="code-line">
+                    <span class="line-num">${i + 1}</span>
+                    <span class="line-content">${highlighted}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function highlightJSON(line) {
+            return line
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"([^"]+)"(\s*:)/g, '<span class="json-key">"$1"</span>$2')
+                .replace(/:\s*"([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+                .replace(/:\s*(\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+                .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
+                .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
+                .replace(/([{}\[\]])/g, '<span class="json-bracket">$1</span>');
+        }
+
+        function copyCode() {
+            const codeSelect = document.getElementById('code-select').value || currentPipeline;
+            if (!codeSelect) return;
+            const spec = pipelines.find(p => p.id === codeSelect);
+            if (!spec) return;
+
+            const codeData = {
+                pipeline: { id: spec.id, name: spec.name, description: spec.description, strategy: "DAG" },
+                dag: { nodes: spec.nodes, edges: spec.edges }
+            };
+
+            navigator.clipboard.writeText(JSON.stringify(codeData, null, 2)).then(() => {
+                showToast('success', 'Copied to clipboard');
+            });
+        }
+
+        // ============================================================================
+        // Token Stats
+        // ============================================================================
+        async function loadTokenStats() {
+            const stats = await api('/api/tokens');
+            document.getElementById('tk-calls').textContent = stats.call_count;
+            document.getElementById('tk-total').textContent = stats.total_tokens.toLocaleString();
+            document.getElementById('tk-prompt').textContent = stats.prompt_tokens.toLocaleString();
+            document.getElementById('tk-cost').textContent = '$' + stats.total_cost.toFixed(4);
+
+            // Update bar chart
+            const maxTokens = Math.max(stats.total_tokens, 1);
+            const bars = document.getElementById('token-bars');
+            bars.innerHTML = `
+                <div class="bar-row">
+                    <div class="bar-label">Prompt</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${(stats.prompt_tokens / maxTokens * 100)}%;background:var(--accent);"></div></div>
+                    <div class="bar-value">${stats.prompt_tokens.toLocaleString()}</div>
+                </div>
+                <div class="bar-row">
+                    <div class="bar-label">Completion</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${(stats.completion_tokens / maxTokens * 100)}%;background:var(--success);"></div></div>
+                    <div class="bar-value">${stats.completion_tokens.toLocaleString()}</div>
+                </div>
+                <div class="bar-row">
+                    <div class="bar-label">API Calls</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${Math.min(stats.call_count / 10 * 100, 100)}%;background:var(--warning);"></div></div>
+                    <div class="bar-value">${stats.call_count}</div>
+                </div>
+            `;
+        }
+
+        // ============================================================================
+        // Footer
+        // ============================================================================
+        function updateFooter() {
+            const spec = pipelines.find(p => p.id === currentPipeline);
+            document.getElementById('footer-pipeline').innerHTML = `
+                <div class="dot ${currentPipeline ? 'blue' : 'green'}"></div>
+                <span>${spec ? spec.name : 'No pipeline selected'}</span>
+            `;
+            document.getElementById('footer-exec').innerHTML = `
+                <span>${isRunning ? '⏳ Executing...' : 'Idle'}</span>
+            `;
+        }
+
+        // ============================================================================
+        // Toast
+        // ============================================================================
+        function showToast(type, msg) {
+            const container = document.getElementById('toast-container');
+            const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                toast.style.transition = '0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ============================================================================
+        // Refresh
+        // ============================================================================
+        async function refreshData() {
+            const [pipes, mdl, tokens] = await Promise.all([
+                api('/api/pipelines'),
+                api('/api/llm/models'),
+                api('/api/tokens'),
+            ]);
+            pipelines = pipes;
+            models = mdl;
+            renderSidebar();
+            populateSelects();
+            loadTokenStats();
+            showToast('info', 'Data refreshed');
+        }
+
+        // ============================================================================
+        // Init
+        // ============================================================================
+        function populateSelects() {
+            ['dag-select', 'runner-select', 'code-select'].forEach(selId => {
+                const sel = document.getElementById(selId);
+                const current = sel.value;
+                sel.innerHTML = '<option value="">Select Pipeline</option>' +
+                    pipelines.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                if (current) sel.value = current;
+            });
+        }
+
+        async function init() {
+            initTheme();
+
+            const [pipes, mdl, tokens] = await Promise.all([
+                api('/api/pipelines'),
+                api('/api/llm/models'),
+                api('/api/tokens'),
+            ]);
+            pipelines = pipes;
+            models = mdl;
+
+            renderSidebar();
+            populateSelects();
+            loadTokenStats();
+            updateFooter();
+
+            // Init mermaid
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: isDark ? 'dark' : 'default',
+                securityLevel: 'loose',
+                flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+            });
+
+            // Auto-select first pipeline
+            if (pipes.length > 0) {
+                selectPipeline(pipes[0].id);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

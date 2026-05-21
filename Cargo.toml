@@ -1,6 +1,9 @@
 # CortexFlow
 # 基于Rust实现的CortexFlow - AI智能体调度框架
 
+[workspace]
+members = [".", "demo"]
+
 [package]
 name = "cortex-flow"
 version = "0.1.0"

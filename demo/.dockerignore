@@ -1,0 +1,30 @@
+# Version control
+.git
+.gitignore
+
+# Build artifacts
+target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+*.md
+!demo/README.md
+
+# Design files
+.design/
+
+# Test data
+tests/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
